@@ -27,7 +27,7 @@ Build-Depends-Indep:
  graphviz,
 Standards-Version: 4.7.0
 Homepage: https://gnupg.org/software/gpgme/
-Vcs-Git: https://github.com/gpgdeb/gpgme.git -b gnupg/stable
+Vcs-Git: https://github.com/gpgdeb/gpgme.git -b gnupg/stable_no_t64
 Vcs-Browser: https://github.com/gpgdeb/gpgme
 Rules-Requires-Root: no
 
