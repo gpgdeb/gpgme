@@ -1,8 +1,9 @@
 gpgme1.0 (1.24.3-2) unstable; urgency=medium
 
-  * renamed packages to resolve conflicts on older distributions
+  * renamed packages to resolve conflicts with pre-t64 distributions
+  * patched python tests to build with GnuPG >= 2.5.10
 
- -- meik michalke <meik.michalke@gnupg.com>  Tue, 29 Jul 2025 10:31:02 +0200
+ -- meik michalke <meik.michalke@gnupg.com>  Wed, 30 Jul 2025 11:51:58 +0200
 
 gpgme1.0 (1.24.3-1) unstable; urgency=medium
 
