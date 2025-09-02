@@ -5,26 +5,16 @@ Maintainer: GnuPG Maintainers <package-maintainers@gnupg.org>
 Build-Depends:
  automake (>= 1.14),
  debhelper-compat (= 13),
- dh-python,
- dpkg-dev (>= 1.21.5),
+ dpkg-dev (>= 1.22.5),
  gnupg-agent,
  gnupg2 | gnupg (>= 2),
  gpgrt-tools,
  gpgsm,
  libassuan-dev (>= 2.4.2),
  libgpg-error-dev (>= 1.36),
- libpython3-all-dev,
  pkgconf,
- python3-all-dev:any,
- python3-setuptools,
- qt6-base-dev (>= 6.4.0),
- qtbase5-dev,
  scdaemon,
- swig,
  texinfo,
-Build-Depends-Indep:
- doxygen,
- graphviz,
 Standards-Version: 4.7.0
 Homepage: https://gnupg.org/software/gpgme/
 Vcs-Git: https://github.com/gpgdeb/gpgme.git -b gnupg/stable
@@ -55,7 +45,7 @@ Depends:
  libassuan-dev,
  libc6-dev,
  libgpg-error-dev,
- libgpgme11t64 (= ${binary:Version}),
+ libgpgme45 (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends},
 Breaks:
@@ -71,13 +61,7 @@ Description: GPGME - GnuPG Made Easy (development files)
  This package contains the headers and other files needed to compile
  against this library.
 
-Package: libgpgme11t64
-Provides:
- ${t64:Provides},
-Replaces:
- libgpgme11,
-Breaks:
- libgpgme11 (<< ${source:Version}),
+Package: libgpgme45
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -96,164 +80,3 @@ Description: GPGME - GnuPG Made Easy (library)
  GnuPG functions, such as encrypt, decrypt, sign, verify, ...
  .
  This package contains the library.
-
-Package: python3-gpg
-Architecture: any
-Section: python
-Provides:
- ${python3:Provides},
-Depends:
- ${misc:Depends},
- ${python3:Depends},
- ${shlibs:Depends},
-Description: Python interface to the GPGME GnuPG encryption library (Python 3)
- The "gpg" Python module is, for the most part, a direct interface to
- the C GPGME library.  However, it is re-packaged in a more Pythonic
- way -- object-oriented with classes and modules.  Take a look at the
- classes defined here -- they correspond directly to certain object
- types in GPGME for C.
- .
- Features:
-  * Feature-rich, full implementation of the GPGME library. Supports
-    all GPGME features except interactive editing (coming soon).
-    Callback functions may be written in pure Python.
-  * Ability to sign, encrypt, decrypt, and verify data.
-  * Ability to list keys, export and import keys, and manage the keyring.
-  * Fully object-oriented with convenient classes and modules.
- .
- This is the official upstream Python 3 binding for GPGME.
-
-Package: libqgpgme15t64
-Provides:
- ${t64:Provides},
-Replaces:
- libqgpgme15,
-Breaks:
- libqgpgme15 (<< ${source:Version}),
-Architecture: any
-Multi-Arch: same
-Depends:
- ${misc:Depends},
- ${shlibs:Depends},
-Description: library for GPGME integration with Qt
- QGpgME is a library that provides GPGME integration with QEventLoop
- and some Qt datatypes (e.g. QByteArray).
- .
- This is the official upstream Qt binding for GPGME.
-
-Package: libqgpgmeqt6-15
-Architecture: any
-Multi-Arch: same
-Depends:
- ${misc:Depends},
- ${shlibs:Depends},
-Description: library for GPGME integration with Qt 6
- QGpgME is a library that provides GPGME integration with QEventLoop
- and some Qt datatypes (e.g. QByteArray).
- .
- This is the official upstream Qt 6 binding for GPGME.
-
-Package: libgpgmepp6t64
-Provides:
- ${t64:Provides},
-Replaces:
- libgpgmepp6,
-Breaks:
- libgpgmepp6 (<< ${source:Version}),
-Architecture: any
-Multi-Arch: same
-Depends:
- ${misc:Depends},
- ${shlibs:Depends},
-Description: C++ wrapper library for GPGME
- GpgME++ (aka GpgMEpp) is a C++ wrapper (or C++ bindings) for the
- GnuPG project's GPGME (GnuPG Made Easy) library.
- .
- This is the official upstream C++ binding for GPGME.
-
-Package: libgpgmepp-dev
-Section: libdevel
-Architecture: any
-Multi-Arch: same
-Depends:
- libgpg-error-dev,
- libgpgmepp6t64 (= ${binary:Version}),
- ${misc:Depends},
-Recommends:
- libgpgmepp-doc (= ${binary:Version}),
-Description: C++ wrapper library for GPGME (development files)
- GpgME++ (aka GpgMEpp) is a C++ wrapper (or C++ bindings) for the
- GnuPG project's GPGME (GnuPG Made Easy) library.
- .
- This package contains the headers and other files needed to compile
- against it.
-
-Package: libqgpgme-dev
-Section: libdevel
-Architecture: any
-Depends:
- libgpgmepp-dev (= ${binary:Version}),
- libqgpgme15t64 (= ${binary:Version}),
- qtbase5-dev,
- ${misc:Depends},
-Conflicts:
- libqgpgmeqt6-dev,
-Breaks:
- kdepimlibs5-dev,
- libgpgmepp-dev (<< 1.23.2-1),
-Replaces:
- kdepimlibs5-dev,
- libgpgmepp-dev (<< 1.23.2-1),
- libqgpgmeqt6-dev,
-Recommends:
- libgpgmepp-doc (= ${binary:Version}),
-Description: Qt bindings for GPGME (development files)
- GpgME++ (aka GpgMEpp) is a C++ wrapper (or C++ bindings) for the
- GnuPG project's GPGME (GnuPG Made Easy) library.
- .
- QGpgME is a library that provides GPGME integration with QEventLoop
- and some Qt datatypes (e.g. QByteArray).
- .
- This package contains the headers and other files needed to compile
- against this library.
-
-Package: libqgpgmeqt6-dev
-Section: libdevel
-Architecture: any
-Conflicts:
- libqgpgme-dev,
-Replaces:
- libqgpgme-dev,
-Depends:
- libgpgmepp-dev (= ${binary:Version}),
- libqgpgmeqt6-15 (= ${binary:Version}),
- ${misc:Depends},
-Recommends:
- libgpgmepp-doc (= ${binary:Version}),
-Description: Qt 6 bindings for GPGME (development files)
- GpgME++ (aka GpgMEpp) is a C++ wrapper (or C++ bindings) for the
- GnuPG project's GPGME (GnuPG Made Easy) library.
- .
- QGpgME is a library that provides GPGME integration with QEventLoop
- and some Qt datatypes (e.g. QByteArray).
- .
- This package contains the headers and other files needed to compile
- against this library with Qt6.
-
-Package: libgpgmepp-doc
-Section: doc
-Architecture: all
-Multi-Arch: foreign
-Depends:
- ${misc:Depends},
-Suggests:
- libgpgmepp-dev,
-Description: C++ and Qt bindings for GPGME (documentation for developers)
- GpgME++ (aka GpgMEpp) is a C++ wrapper (or C++ bindings) for the
- GnuPG project's GPGME (GnuPG Made Easy) library.
- .
- QGpgME is a library that provides GPGME integration with QEventLoop
- and some Qt datatypes (e.g. QByteArray).
- .
- This package contains documentation for developers describing how to
- use these packages.
