@@ -1,51 +1,211 @@
-2025-05-19  Werner Koch  <wk@gnupg.org>
+2025-06-03  Werner Koch  <wk@gnupg.org>
 
-	Release 1.24.3.
-	+ commit 6403435fa18758f44abdc679779de85201afc509
-
-
-2025-05-05  Ingo Klöcker  <dev@ingo-kloecker.de>
-
-	cpp: Ensure correct expiration time on 32-bit arch with 64-bit time_t.
-	+ commit f23cef6f66a44c5c1cc8717f74b658d14fde04e5
-	* lang/cpp/src/key.cpp (Subkey::expirationTime): Cast away the
-	signedness of _gpgme_subkey.expires before casting to time_t.
-
-2025-04-15  Ingo Klöcker  <dev@ingo-kloecker.de>
-
-	cpp: Add missing transition, remove two ignored (and wrong) transitions.
-	+ commit e327305b9669107235ebe5e1e929988c1adefce9
-	* lang/cpp/src/gpgsignkeyeditinteractor.cpp (makeTable): Remove two
-	transitions.  Add one transition.
-
-	* lang/cpp/src/gpgsignkeyeditinteractor.cpp (makeTable)
-	<sign_uid.dupe_okay>: Add one more transition.
-
-2025-04-11  Ingo Klöcker  <dev@ingo-kloecker.de>
-
-	cpp: Validate the transition map.
-	+ commit 64bb704a25ea1384666d5f0d5202363f4271d948
-	* lang/cpp/src/gpgsignkeyeditinteractor.cpp (makeTable): Assert that
-	all transitions go from one state to a different state.
-
-	cpp: Ensure that all transitions go from one state to a different state.
-	+ commit a4945675ece2c1e915fc49298adfd927737ede3d
-	* src/gpgsignkeyeditinteractor.cpp (makeTable): Replace transitions from
-	CONFIRM to CONFIRM with transitions from CONFIRM to CONFIRM2 and vice
-	versa. Add transitions from CONFIRM2 to some other state for all
-	transitions from CONFIRM to some other state.
-
-2025-02-10  Werner Koch  <wk@gnupg.org>
-
-	Release 1.24.2.
-	+ commit 5214a34ba766d5eba4d0c1ce53be51e118382476
+	Release 2.0.0.
+	+ commit e17ba578861905857da0a514b4fc9b88a57f7346
 
 
-2025-02-04  Werner Koch  <wk@gnupg.org>
+2025-05-24  Werner Koch  <wk@gnupg.org>
+
+	Fix an include guard.
+	+ commit e763305ff1ce2aeaef1087f543ceb473bc3cb8d2
+	* src/json-common.h (GPGME_JSON_COMMON_H): Fix guard.
+
+2025-05-23  Werner Koch  <wk@gnupg.org>
+
+	json: Fix minor memory leak.
+	+ commit 66de35a9b1170815e51005996441318bd9574e68
+	* src/json-core.c (json_core_process_request): Fix leak and worng
+	formatting in interactive mode in case of an error.
+
+	Refactor gpgme-json for future re-use.
+	+ commit d7267db472a4e4f65c8139f68d9d976c64b79636
+	* src/gpgme-json.c: Factor large chunks of code out to ...
+	* src/json-core.c: new file and ...
+	* src/json-util.c: new file and ...
+	* src/json-common.h: new file.
+	* src/Makefile.am (gpgme_json_SOURCES): Add new files.
+
+2025-05-14  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Treat empty algorithm the same way as unset algorithm.
+	+ commit 15ae7da74bc403d19df8d3ca3c0176b7dac98e18
+	* src/engine-gpg.c (gpg_add_algo_usage_expire): Add "default" as
+	algorithm argument if algo is NULL or an empty string.
+
+2025-05-13  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Add algorithm, usage and expire also if only the group flag is set.
+	+ commit 8f08ca0e382085f9caba8ff969aa1ce66b6a84c8
+	* src/engine-gpg.c (gpg_add_algo_usage_expire): Check flags for
+	GPGME_CREATE_GROUP flag.
+
+2025-05-12  Werner Koch  <wk@gnupg.org>
+
+	Add GPGME_CREATE_GROUP flag for gpgme_op_createkey and _createsubkey.
+	+ commit 905bd760a99a455af6717b66311fc2197dea1055
+	* src/gpgme.h.in (GPGME_CREATE_GROUP): New.
+	* src/engine-gpg.c (gpg_add_algo_usage_expire): Pass to engine.
+	* tests/run-genkey.c (parse_usage_string): Support here too.
+
+2025-05-05  Werner Koch  <wk@gnupg.org>
+
+	Change timestamp fields from signed to unsigned long.
+	+ commit f2d40473b522e348d96a70c089d2191d0b978098
+	* src/gpgme.h.in (struct _gpgme_subkey): Chnage timestamp and expires.
+	(struct _gpgme_key_sig): Ditto.
+	(struct _gpgme_new_signature): Ditto.
+
+	Allow signing using an exactly specified subkey.
+	+ commit bfd320abfeaf0c7a16af3057279c77a45bfa961a
+	* src/engine-gpg.c (append_args_from_signers): Detect exactly
+	specified keys and apped the '!' suffix.
+
+	Mark the subkey used to find a key.
+	+ commit 87d6da1188db3c7df899821e4c0d895c61504522
+	* src/gpgme.h.in (struct _gpgme_subkey): New flag subkey_match.
+	* src/keylist.c (spacep): New.
+	(op_data_t): Add field requested_subkey.
+	(release_op_data): Free it.
+	(exact_match_pattern): New.
+	(maybe_setup_for_requested_subkey): New.
+	(gpgme_op_keylist_start): Call it here.
+	(gpgme_op_keylist_ext_start): Call it for each pattern until one
+	found.
+	(gpgme_op_keylist_next): Set the subkey_match field.
+	---
+
+	This is needed for
+
+2025-03-18  Werner Koch  <wk@gnupg.org>
+
+	New decrypt flags GPGME_DECRYPT_LISTONLY.
+	+ commit 91a59d2a35540769c055da2341b5face0be6c286
+	* src/gpgme.h.in (GPGME_DECRYPT_LISTONLY): New.
+	* src/decrypt.c (op_data_t): Add member list_only.
+	(_gpgme_decrypt_status_handler): Do not return NO_DATA in list_only
+	mode.
+	(_gpgme_op_decrypt_init_result): Add arg flags and set the list_only
+	flag.
+	(_gpgme_decrypt_start): Pss flags to the init function.
+	* src/decrypt-verify.c (decrypt_verify_start): Ditto.
+	* src/engine-gpg.c (gpg_decrypt): Add --list-only if flag is set.
+
+	* tests/run-decrypt.c (main): Add option --list-only.
+
+2025-03-14  Werner Koch  <wk@gnupg.org>
+
+	Add API gpgme_op_random_value.
+	+ commit 926b1f1f1e3e382f08cc57fc86d5892649514007
+	* src/genrandom.c (getrandom_size_t): New.
+	(gpgme_op_random_value): New.
+	* src/gpgme.def: Add new function.
+	* src/libgpgme.vers: Ditto.
+	* src/gpgme.h.in: Add prototype.
+
+	* tests/run-genrandom.c: Add an option to use the new function.
+
+2025-03-10  NIIBE Yutaka  <gniibe@fsij.org>
+
+	m4: Update libassuan.m4.
+	+ commit 7568566ef3d1230ee134b3db3128c8681ebecf37
+	* m4/libassuan.m4: Update from libassuan master.
+
+2025-02-26  Werner Koch  <wk@gnupg.org>
+
+	Add API gpgme_op_random_bytes.
+	+ commit 0a64c7d0c6d0463cf2e06b3a01ef5be4d879bcf0
+	* src/genrandom.c: New.
+	* src/Makefile.am: Add new file.
+	* src/engine-backend.h (struct engine_ops): Add func ptr getdirect.
+	Adjust all engine_ops.
+	* src/engine-gpg.c (gpg_getdirect): New.
+	(_gpgme_engine_ops_gpg): Connect new handler.
+	* src/gpgme.h.in (gpgme_random_mode_t): New.
+	(GPGME_RANDOM_MODE_NORMAL): New.
+	(GPGME_RANDOM_MODE_ZBASE32): New.
+	(gpgme_op_random_bytes): New public function
+	* src/libgpgme.vers: Add function.
+	* src/gpgme.def: Add function.
+
+	* tests/run-genrandom.c: New.
+	* tests/Makefile.am: Add new file.
+
+2025-02-21  Werner Koch  <wk@gnupg.org>
+
+	Remove now unused functions.
+	+ commit 2e21919a1b2663137c123917cee0a12b98ad36b2
+	* src/engine.c (_gpgme_engine_op_trustlist): Remove.
+	* src/libgpgme.vers (gpgme_op_trustlist_end)
+	(gpgme_op_trustlist_next)
+	(gpgme_op_trustlist_start): Remove.
+	* src/gpgme.def: Ditto.
+	* src/key.c (otrust_to_string)
+	(validity_to_string)
+	(capabilities_to_string)
+	(get_keysig): Remove
+
+	Remove the long deprecated and never working trust list functions.
+	+ commit 7e6a65e66a96278bed5fed6d0b75887c0f032c4e
+	* src/trust-item.c: Remove file.
+	* src/trustlist.c: Remove file.
+	* src/Makefile.am (main_sources): Remove those files.
+	* src/gpgme.h.in (GPGME_EVENT_NEXT_TRUSTITEM): Remove.
+	(gpgme_trust_item_t, GpgmeTrustItem): Remove.
+	(gpgme_op_trustlist_start): Remove.
+	(gpgme_op_trustlist_next): Remove.
+	(gpgme_op_trustlist_end): Remove.
+	(gpgme_trust_item_ref): Remove.
+	(gpgme_trust_item_unref, gpgme_trust_item_release): Remove.
+	* src/gpgme.def: Remove removed functions.
+	* src/libgpgme.vers: Ditto.
+
+	Remove long deprecated functions.
+	+ commit d54d6eaa642ba6de179ef280930525c7367c9b88
+	* src/gpgme.h.in (GPGME_EXPORT_MODE_NOUID): Remove.  This was a
+	left-over from an experiment.
+	(gpgme_attr_t,_gpgme_attr_t) Remove.  Deprecated sinze 2003.
+	(gpgme_get_sig_ulong_attr): Ditto.
+	(gpgme_get_sig_string_attr): Ditto.
+	(gpgme_key_get_string_attr): Ditto.
+	(gpgme_key_get_ulong_attr): Ditto.
+	(gpgme_key_sig_get_string_attr): Ditto.
+	(gpgme_key_sig_get_ulong_attr): Ditto.
+	(gpgme_trust_item_get_string_attr): Ditto.
+	(gpgme_trust_item_get_int_attr): Ditto.
+	* src/gpgme.def: Remove them here too.
+	* src/libgpgme.vers: Ditto.
+	* src/trust-item.c: Remove corresponding implementations.
+	* src/verify.c: Ditto.
+	* src/key.c: Ditto.
+
+2025-02-03  Werner Koch  <wk@gnupg.org>
 
 	core: Fix regression for RSA in gpgme_pubkey_algo_string.
-	+ commit a6e8f961436dd470b819ff3fa3ed0da946dafc87
+	+ commit 7d09f1f9fbf8889f467a06432f1954f9ad4f5922
 	* src/gpgme.c (gpgme_pubkey_algo_string): Consider all RSA variants.
+
+2025-02-03  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	python: Remove Python bindings.
+	+ commit 932caf37d36eca2caec59bf48bc505364a5765bb
+	* README: Update.
+	* configure.ac: Remove checks, variables and file generations related to
+	the Python bindings. Remove python from available_languages and
+	default_languages.
+	* lang/Makefile.am (DIST_SUBDIRS): Remove python.
+	* lang/python: Remove.
+	* m4/ax_pkg_swig.m4, m4/ax_python_devel.m4, m4/python.m4: Remove.
+
+	cpp,qt: Remove C++ and Qt bindings.
+	+ commit 763d5f5d6a88ec938b8678ab597e1404af724553
+	* README: Update.
+	* configure.ac: Remove checks, variables and file generations related to
+	the C++/Qt bindings. Remove cpp and qt* from available_languages and
+	default_languages.
+	* lang/Makefile.am (DIST_SUBDIRS): Remove cpp and qt.
+	* lang/cpp, lang/qt: Remove.
+	* m4/ax_check_compile_flag.m4, m4/ax_cxx_compile_stdcxx.m4,
+	m4/ax_gcc_func_attribute.m4, m4/pkg.m4, m4/qt5.m4, m4/qt6.m4: Remove.
 
 2025-01-15  Ingo Klöcker  <dev@ingo-kloecker.de>
 
