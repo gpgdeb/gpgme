@@ -20,59 +20,7 @@ Forwarded: not-needed
 
 --- a/autogen.sh
 +++ b/autogen.sh
-@@ -242,43 +242,16 @@ if [ "$myhost" = "find-version" ]; then
-       matchstr3="$package-$major-base"
-       vers="$major.$minor.$micro"
-     fi
- 
-     beta=no
--    if [ -e .git ]; then
--      ingit=yes
--      tmp=$(git describe --match "${matchstr1}" --long 2>/dev/null)
--      if [ -n "$tmp" ]; then
--          tmp=$(echo "$tmp" | sed s/^"$package"// \
--                    | awk -F- '$3!=0 && $3 !~ /^beta/ {print"-beta"$3}')
--      else
--          # (due tof "-base" in the tag we need to take the 4th field)
--          tmp=$(git describe --match "${matchstr2}" --long 2>/dev/null)
--          if [ -n "$tmp" ]; then
--              tmp=$(echo "$tmp" | sed s/^"$package"// \
--                        | awk -F- '$4!=0 && $4 !~ /^beta/ {print"-beta"$4}')
--          elif [ -n "${matchstr3}" ]; then
--              tmp=$(git describe --match "${matchstr3}" --long 2>/dev/null)
--              if [ -n "$tmp" ]; then
--                  tmp=$(echo "$tmp" | sed s/^"$package"// \
--                          | awk -F- '$4!=0 && $4 !~ /^beta/ {print"-beta"$4}')
--              fi
--          fi
--      fi
--      [ -n "$tmp" ] && beta=yes
--      cid=$(git rev-parse --verify HEAD | tr -d '\n\r')
--      rev=$(git rev-parse --short HEAD | tr -d '\n\r')
--      rvd=$((0x$(echo ${rev} | dd bs=1 count=4 2>/dev/null)))
--    else
--      ingit=no
--      beta=yes
--      tmp="-unknown"
--      cid="0000000"
--      rev="0000000"
--      rvd="0"
--    fi
--
-+    ingit=no
-+    tmp=""
-+    rvd="$(wc -l < debian/changelog)"
-+    rev="$(printf %07x $rvd)"
-+    cid="$rev"
-+ 
-     echo "$package-$vers$tmp:$beta:$ingit:$vers$tmp:$vers:$tmp:$rev:$rvd:$cid:"
-     exit 0
- fi
- # **** end FIND VERSION ****
- 
-@@ -449,52 +422,10 @@ the corresponding environment variables;
- 
- EOF
+@@ -475,48 +475,6 @@ EOF
      die_p
  fi
  
@@ -121,5 +69,3 @@ Forwarded: not-needed
  aclocal_flags="-I m4"
  if [ -n "${extra_aclocal_flags}" ]; then
    aclocal_flags="${aclocal_flags} ${extra_aclocal_flags}"
- fi
- if [ -n "${ACLOCAL_FLAGS}" ]; then
