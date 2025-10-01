@@ -20,7 +20,7 @@ Forwarded: not-needed
 
 --- a/autogen.sh
 +++ b/autogen.sh
-@@ -475,48 +475,6 @@ EOF
+@@ -475,50 +475,6 @@ EOF
      die_p
  fi
  
@@ -31,7 +31,8 @@ Forwarded: not-needed
 -  if cp --version >/dev/null 2>/dev/null; then
 -    [ -z "${SILENT}" ] && CP="$CP -v"
 -  fi
--  if [ -f .git/hooks/pre-commit.sample -a ! -f .git/hooks/pre-commit ] ; then
+-  if [ -f .git/hooks/pre-commit.sample ] \
+-      && [ ! -f .git/hooks/pre-commit ]; then
 -    [ -z "${SILENT}" ] && cat <<EOF
 -*** Activating trailing whitespace git pre-commit hook. ***
 -    For more information see this thread:
@@ -53,7 +54,8 @@ Forwarded: not-needed
 -        "awk '/^\"POT-Creation-Date:/&&!s{s=1;next};!/^#: /{print}'"
 -    fi
 -  fi
--  if [ -f build-aux/git-hooks/commit-msg -a ! -f .git/hooks/commit-msg ] ; then
+-  if [ -f build-aux/git-hooks/commit-msg ] \
+-     && [ ! -f .git/hooks/commit-msg ]; then
 -      [ -z "${SILENT}" ] && cat <<EOF
 -*** Activating commit log message check hook. ***
 -EOF
