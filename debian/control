@@ -38,6 +38,20 @@ Description: Use GnuPG with web browser extensions
  Manifest files enabling GnuPG's use with Mailvelope (https://mailvelope.com)
  on Chromium and Firefox are also provided in this package.
 
+Package: gnupg-manage-keys
+Section: utils
+Architecture: any
+Multi-Arch: foreign
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: Framework for adding new features
+ GPGME is a wrapper library which provides a C API to access some of the
+ GnuPG functions, such as encrypt, decrypt, sign, verify, ...
+ .
+ This package contains the gpgme-key-manage binary, a tool as a framework
+ for adding features which would normally be implemented by a script.
+
 Package: libgpgme-dev
 Section: libdevel
 Architecture: any
