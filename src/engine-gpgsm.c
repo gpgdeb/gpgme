@@ -691,6 +691,23 @@ gpgsm_assuan_simple_command (engine_gpgsm_t gpgsm, const char *cmd,
   gpg_error_t err, cb_err;
   char *line;
   size_t linelen;
+  struct io_select_fd_s fds[2];
+  struct io_cb_data iocb_data;
+  int nfds = 0;
+
+  iocb_data.handler_value = gpgsm->diag_cb.data;
+  iocb_data.op_err = 0;
+
+  memset (fds, 0, sizeof (struct io_select_fd_s)*2);
+  fds[nfds].fd = gpgsm->status_cb.fd;
+  fds[nfds].for_read = 1;
+  nfds++;
+  if (gpgsm->diag_cb.fd != -1)
+    {
+      fds[nfds].fd = gpgsm->diag_cb.fd;
+      fds[nfds].for_read = 1;
+      nfds++;
+    }
 
   err = assuan_write_line (ctx, cmd);
   if (err)
@@ -699,6 +716,24 @@ gpgsm_assuan_simple_command (engine_gpgsm_t gpgsm, const char *cmd,
   cb_err = 0;
   do
     {
+      fds[0].signaled = fds[1].signaled = 0;
+      if (gpgsm->status_cb.fd != -1
+	  && _gpgme_io_select (fds, nfds, 0) < 0)
+	{
+          err = gpg_error_from_syserror ();
+	  break;
+	}
+
+      if (gpgsm->diag_cb.fd != -1 && fds[1].signaled)
+	{
+	  err = _gpgme_data_inbound_handler (&iocb_data, gpgsm->diag_cb.fd);
+	  if (err)
+	    break;
+	}
+
+      if (gpgsm->status_cb.fd != -1 && !fds[0].signaled)
+	continue;
+
       err = assuan_read_line (ctx, &line, &linelen);
       if (err)
 	break;
@@ -1166,33 +1201,14 @@ add_io_cb (engine_gpgsm_t gpgsm, iocb_data_t *iocbd, gpgme_io_cb_t handler)
 
 
 static gpgme_error_t
-start (engine_gpgsm_t gpgsm, const char *command)
+prepare (engine_gpgsm_t gpgsm)
 {
-  gpgme_error_t err;
+  gpgme_error_t err = 0;
   assuan_fd_t afdlist[5];
+  /* FIXME: the type int and assuan_fd_t may be incompatible.  */
   int fdlist[5];
   int nfds;
   int i;
-
-  if (*gpgsm->request_origin)
-    {
-      char *cmd;
-
-      cmd = _gpgme_strconcat ("OPTION request-origin=",
-                              gpgsm->request_origin, NULL);
-      if (!cmd)
-        return gpg_error_from_syserror ();
-      err = gpgsm_assuan_simple_command (gpgsm, cmd, NULL, NULL);
-      free (cmd);
-      if (err && gpg_err_code (err) != GPG_ERR_UNKNOWN_OPTION)
-        return err;
-    }
-
-  gpgsm_assuan_simple_command (gpgsm,
-                               gpgsm->flags.offline ?
-                               "OPTION offline=1":
-                               "OPTION offline=0" ,
-                               NULL, NULL);
 
   /* We need to know the fd used by assuan for reads.  We do this by
      using the assumption that the first returned fd from
@@ -1217,7 +1233,36 @@ start (engine_gpgsm_t gpgsm, const char *command)
 
   gpgsm->status_cb.fd = _gpgme_io_dup (fdlist[0]);
   if (gpgsm->status_cb.fd < 0)
-    return gpg_error_from_syserror ();
+    err = gpg_error_from_syserror ();
+
+  return err;
+}
+
+
+static gpgme_error_t
+start (engine_gpgsm_t gpgsm, const char *command)
+{
+  gpgme_error_t err;
+
+  if (*gpgsm->request_origin)
+    {
+      char *cmd;
+
+      cmd = _gpgme_strconcat ("OPTION request-origin=",
+                              gpgsm->request_origin, NULL);
+      if (!cmd)
+        return gpg_error_from_syserror ();
+      err = gpgsm_assuan_simple_command (gpgsm, cmd, NULL, NULL);
+      free (cmd);
+      if (err && gpg_err_code (err) != GPG_ERR_UNKNOWN_OPTION)
+        return err;
+    }
+
+  gpgsm_assuan_simple_command (gpgsm,
+                               gpgsm->flags.offline ?
+                               "OPTION offline=1":
+                               "OPTION offline=0" ,
+                               NULL, NULL);
 
   if (_gpgme_io_set_close_notify (gpgsm->status_cb.fd,
 				  close_notify_handler, gpgsm))
@@ -1319,6 +1364,10 @@ gpgsm_decrypt (void *engine,
   if (!gpgsm)
     return gpg_error (GPG_ERR_INV_VALUE);
 
+  err = prepare (gpgsm);
+  if (err)
+    return err;
+
   err = send_input_size_hint (gpgsm, ciph);
   if (err)
     return err;
@@ -1334,7 +1383,7 @@ gpgsm_decrypt (void *engine,
   gpgsm_clear_fd (gpgsm, MESSAGE_FD);
   gpgsm->inline_data = NULL;
 
-  err = start (engine, "DECRYPT");
+  err = start (gpgsm, "DECRYPT");
   return err;
 }
 
@@ -1397,12 +1446,17 @@ gpgsm_delete (void *engine, gpgme_key_t key, unsigned int flags)
     }
   *linep = '\0';
 
+  err = prepare (gpgsm);
+  if (err)
+    goto leave;
+
   gpgsm_clear_fd (gpgsm, OUTPUT_FD);
   gpgsm_clear_fd (gpgsm, INPUT_FD);
   gpgsm_clear_fd (gpgsm, MESSAGE_FD);
   gpgsm->inline_data = NULL;
 
   err = start (gpgsm, line);
+ leave:
   free (line);
 
   return err;
@@ -1539,6 +1593,10 @@ gpgsm_encrypt (void *engine, gpgme_key_t recp[], const char *recpstring,
   if (flags & (GPGME_ENCRYPT_ARCHIVE | GPGME_ENCRYPT_FILE))
     return gpg_error (GPG_ERR_NOT_IMPLEMENTED);
 
+  err = prepare (gpgsm);
+  if (err)
+    return err;
+
   if ((flags & GPGME_ENCRYPT_NO_ENCRYPT_TO))
     {
       err = gpgsm_assuan_simple_command (gpgsm,
@@ -1621,6 +1679,10 @@ gpgsm_export (void *engine, const char *pattern, gpgme_export_mode_t mode,
     }
   strcat (cmd, pattern);
 
+  err = prepare (gpgsm);
+  if (err)
+    goto leave;
+
   gpgsm->output_cb.data = keydata;
   err = gpgsm_set_fd (gpgsm, OUTPUT_FD, use_armor ? "--armor"
 		      : map_data_enc (gpgsm->output_cb.data));
@@ -1631,6 +1693,7 @@ gpgsm_export (void *engine, const char *pattern, gpgme_export_mode_t mode,
   gpgsm->inline_data = NULL;
 
   err = start (gpgsm, cmd);
+ leave:
   free (cmd);
   return err;
 }
@@ -1728,6 +1791,10 @@ gpgsm_export_ext (void *engine, const char *pattern[], gpgme_export_mode_t mode,
     }
   *linep = '\0';
 
+  err = prepare (gpgsm);
+  if (err)
+    goto leave;
+
   gpgsm->output_cb.data = keydata;
   err = gpgsm_set_fd (gpgsm, OUTPUT_FD, use_armor ? "--armor"
 		      : map_data_enc (gpgsm->output_cb.data));
@@ -1738,6 +1805,7 @@ gpgsm_export_ext (void *engine, const char *pattern[], gpgme_export_mode_t mode,
   gpgsm->inline_data = NULL;
 
   err = start (gpgsm, line);
+ leave:
   free (line);
   return err;
 }
@@ -1763,6 +1831,10 @@ gpgsm_genkey (void *engine,
     {
       if (!pubkey || seckey)
         return gpg_error (GPG_ERR_INV_VALUE);
+
+      err = prepare (gpgsm);
+      if (err)
+	return err;
 
       gpgsm->input_cb.data = help_data;
       err = gpgsm_set_fd (gpgsm, INPUT_FD, map_data_enc (gpgsm->input_cb.data));
@@ -1814,6 +1886,10 @@ gpgsm_import (void *engine, gpgme_data_t keydata, gpgme_key_t *keyarray,
 
   if (keydata && keyarray)
     return gpg_error (GPG_ERR_INV_VALUE); /* Only one is allowed.  */
+
+  err = prepare (gpgsm);
+  if (err)
+    return err;
 
   dataenc = gpgme_data_get_encoding (keydata);
 
@@ -1918,6 +1994,10 @@ gpgsm_keylist (void *engine, const char *pattern, int secret_only,
   if (!pattern)
     pattern = "";
 
+  err = prepare (gpgsm);
+  if (err)
+    return err;
+
   /* Hack to make sure that the agent is started.  Only if the agent
      has been started an application may connect to the agent via
      GPGME_PROTOCOL_ASSUAN - for example to look for smartcards.  We
@@ -2006,6 +2086,10 @@ gpgsm_keylist_ext (void *engine, const char *pattern[], int secret_only,
     list_mode |= 1;
   if (mode & GPGME_KEYLIST_MODE_EXTERN)
     list_mode |= 2;
+
+  err = prepare (gpgsm);
+  if (err)
+    return err;
 
   /* Always send list-mode option because RESET does not reset it.  */
   if (gpgrt_asprintf (&line, "OPTION list-mode=%d", (list_mode & 3)) < 0)
@@ -2134,6 +2218,10 @@ gpgsm_sign (void *engine, gpgme_data_t in, gpgme_data_t out,
                | GPGME_SIG_MODE_FILE))
     return gpg_error (GPG_ERR_INV_VALUE);
 
+  err = prepare (gpgsm);
+  if (err)
+    return err;
+
   /* FIXME: This does not work as RESET does not reset it so we can't
      revert back to default.  */
   if (include_certs != GPGME_INCLUDE_CERTS_DEFAULT)
@@ -2207,6 +2295,10 @@ gpgsm_verify (void *engine, gpgme_verify_flags_t flags, gpgme_data_t sig,
 
   if (flags & GPGME_VERIFY_ARCHIVE)
     return gpg_error (GPG_ERR_NOT_IMPLEMENTED);
+
+  err = prepare (gpgsm);
+  if (err)
+    return err;
 
   gpgsm->input_cb.data = sig;
   err = gpgsm_set_fd (gpgsm, INPUT_FD, map_data_enc (gpgsm->input_cb.data));
@@ -2292,6 +2384,10 @@ gpgsm_getauditlog (void *engine, gpgme_data_t output, unsigned int flags)
 
   if (!gpgsm->assuan_ctx)
     return gpg_error (GPG_ERR_INV_VALUE);
+
+  err = prepare (gpgsm);
+  if (err)
+    return err;
 
 #if USE_DESCRIPTOR_PASSING
   gpgsm->output_cb.data = output;
@@ -2385,6 +2481,10 @@ gpgsm_passwd (void *engine, gpgme_key_t key, unsigned int flags)
 
   if (!key || !key->subkeys || !key->subkeys->fpr)
     return gpg_error (GPG_ERR_INV_CERT_OBJ);
+
+  err = prepare (gpgsm);
+  if (err)
+    return err;
 
   if (gpgrt_asprintf (&line, "PASSWD -- %s", key->subkeys->fpr) < 0)
     return gpg_error_from_syserror ();

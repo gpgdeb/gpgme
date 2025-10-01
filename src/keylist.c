@@ -454,7 +454,7 @@ parse_sec_field15 (gpgme_key_t key, gpgme_subkey_t subkey, char *field)
       subkey->secret = 0;
       key->secret = 1;
     }
-  else if (strchr ("01234567890ABCDEFabcdef", *field))
+  else if (strchr ("0123456789ABCDEFabcdef", *field))
     {
       /* Fields starts with a hex digit; thus it is a serial number.  */
       key->secret = 1;
@@ -1005,7 +1005,7 @@ keylist_colon_handler (void *priv, char *line)
 
       /* Start a new (revoked) signature.  */
       assert (opd->tmp_uid == key->_last_uid);
-      keysig = _gpgme_key_add_sig (key, (fields >= 10) ? field[9] : NULL);
+      keysig = _gpgme_key_add_uid_sig (key, (fields >= 10) ? field[9] : NULL);
       if (!keysig)
 	return gpg_error (GPG_ERR_ENOMEM);	/* FIXME */
 

@@ -32,7 +32,7 @@ min_automake_version="1.14"
 m4_define([mym4_package],[gpgme])
 m4_define([mym4_major], [2])
 m4_define([mym4_minor], [0])
-m4_define([mym4_micro], [0])
+m4_define([mym4_micro], [1])
 
 # Below is m4 magic to extract and compute the git revision number,
 # the decimalized short revision number, a beta version string and a
@@ -57,7 +57,7 @@ AC_INIT([mym4_package],[mym4_version],[https://bugs.gnupg.org])
 #
 LIBGPGME_LT_CURRENT=45
 LIBGPGME_LT_AGE=0
-LIBGPGME_LT_REVISION=0
+LIBGPGME_LT_REVISION=1
 ################################################
 
 AC_SUBST(LIBGPGME_LT_CURRENT)
@@ -589,7 +589,7 @@ AC_DEFINE(GPG_ERR_SOURCE_DEFAULT, GPG_ERR_SOURCE_GPGME,
           [The default error source for GPGME.])
 
 AM_CONDITIONAL(USE_GPGRT_CONFIG, [test -n "$GPGRT_CONFIG" \
-                                  -a "$ac_cv_path_GPG_ERROR_CONFIG" = no])
+                                  && test "$ac_cv_path_GPG_ERROR_CONFIG" = no])
 
 # And for libassuan.
 have_libassuan=no
@@ -742,7 +742,7 @@ GPGME_CONFIG_AVAIL_LANG="$enabled_languages"
 case "$includedir" in
   /usr/include|/include) ;;
   '${prefix}/include')
-    if test "$prefix" != / -a "$prefix" != /usr; then
+    if test "$prefix" != / && test "$prefix" != /usr; then
       if test -z "$GPGME_CONFIG_CFLAGS"; then
         GPGME_CONFIG_CFLAGS="-I\${includedir}"
       else
@@ -762,10 +762,10 @@ case "$libdir" in
   /usr/lib|/usr/lib64|/lib|/lib64) ;;
   '${exec_prefix}/lib'|'${exec_prefix}/lib64')
     if test "$exec_prefix" = "NONE"; then
-      if test "$prefix" != / -a "$prefix" != /usr; then
+      if test "$prefix" != / && test "$prefix" != /usr; then
         GPGME_CONFIG_LIBS="-L\${libdir} $GPGME_CONFIG_LIBS"
       fi
-    elif test "$exec_prefix" != / -a "$exec_prefix" != /usr; then
+    elif test "$exec_prefix" != / && test "$exec_prefix" != /usr; then
       GPGME_CONFIG_LIBS="-L\${libdir} $GPGME_CONFIG_LIBS"
     fi
     ;;
@@ -839,6 +839,7 @@ AC_CONFIG_FILES(Makefile src/Makefile
                 tests/gpgsm/Makefile
                 tests/opassuan/Makefile
                 tests/json/Makefile
+                tools/Makefile
 		doc/Makefile
                 src/versioninfo.rc
                 src/gpgme.pc
