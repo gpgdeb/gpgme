@@ -38,7 +38,7 @@ Description: Use GnuPG with web browser extensions
  Manifest files enabling GnuPG's use with Mailvelope (https://mailvelope.com)
  on Chromium and Firefox are also provided in this package.
 
-Package: gnupg-manage-keys
+Package: gnupg-key-manage
 Section: utils
 Architecture: any
 Multi-Arch: foreign
