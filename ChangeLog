@@ -1,3 +1,84 @@
+2025-09-23  Werner Koch  <wk@gnupg.org>
+
+	Release 2.0.1.
+	+ commit e4adebe020b07bc47e583817576ce98ca93e9711
+
+
+2025-08-29  NIIBE Yutaka  <gniibe@fsij.org>
+
+	gpgsm: Extend gpgsm_assuan_simple_command to consule diag output.
+	+ commit cff9df67d34fa21fc8f3ba47300e1671c4526629
+	* src/engine-gpgsm.c (gpgsm_assuan_simple_command): Take care about
+	diag output.
+
+	gpgsm: Introduce two phase interactions to consume diag output.
+	+ commit 52bde50b879c2b9318c87eb9f377bed6557366e2
+	* src/engine-gpgsm.c (prepare): Move the first part from...
+	(start): ... here.
+	(gpgsm_decrypt, gpgsm_delete, gpgsm_encrypt)
+	(gpgsm_export, gpgsm_export_ext, gpgsm_genkey)
+	(gpgsm_import, gpgsm_keylist, gpgsm_keylist_ext)
+	(gpgsm_sign, gpgsm_verify, gpgsm_getauditlog)
+	(gpgsm_passwd): Follow the change.
+
+2025-07-18  Werner Koch  <wk@gnupg.org>
+
+	Make it easier to maintain gpgme.h by using forward declarations.
+	+ commit 6a1f72b4702488f5ee4e14ef308876349ac8a005
+	* src/gpgme.h.in: Use forward declarations for the key objects.
+
+2025-07-16  Werner Koch  <wk@gnupg.org>
+
+	Rename an internal function for clarity.
+	+ commit 1821ebaa333dfadf936b8fc38dd8483abee7aab3
+	* src/key.c (_gpgme_key_add_sig): Rename to ...
+	(_gpgme_key_add_uid_sig): this.
+
+2025-07-15  Werner Koch  <wk@gnupg.org>
+
+	gnupg-manage-keys: Implement a new tool.
+	+ commit 9e3266ccbbdf6ab9b37ec4e0c5342630dc0ffa82
+	* tools/gnupg-key-manage.c: new.
+	* tools/Makefile.am: New.
+	* configure.ac: Add Makefile.
+	* Makefile.am (SUBDIRS): Add tools directory.
+
+2025-07-05  Collin Funk via Gnupg-devel  <gnupg-devel@gnupg.org>
+
+	Fix an uninitialized variable.
+	+ commit 6e37569847d7948c63c14dd67c42993eb21d6018
+	* src/engine-gpg.c (gpg_getdirect): Initialize ERR to zero to satisfy
+	the loop condition.
+
+2025-07-03  Collin Funk via Gnupg-devel  <gnupg-devel@gnupg.org>
+
+	Remove duplicate character passed to strchr.
+	+ commit 74b725457432173865299c046adc4b42d263ecac
+	* src/keylist.c (parse_sec_field15): Remove duplicate '0' character.
+
+2025-06-23  NIIBE Yutaka  <gniibe@fsij.org>
+
+	Use sysconf as a fallback mechanism in the initialization.
+	+ commit 8caa7cc517ebf61c5e47c9b571169740a9301acb
+	* src/posix-io.c (max_fds_fallback): New.
+	[_SC_OPEN_MAX] (_gpgme_io_subsystem_init): Set max_fds_fallback.
+	(get_max_fds): Use max_fds_fallback.
+
+	Fix debug output of posix-io.c.
+	+ commit 075e5be9fbee6022e640ffd759b2d500d29bf5cd
+	* src/posix-io.c (_gpgme_io_select_poll): Emit the file descriptor
+	information just like _gpgme_io_select_select.
+
+2025-06-20  NIIBE Yutaka  <gniibe@fsij.org>
+
+	posix: Clean up get_max_fds implementation.
+	+ commit e8e5434cc4f5cc3c322659792cc1850a5c5b26b8
+	* src/posix-io.c (get_max_fds): Return type is int.
+	Ifdef-out TRACE.
+	Remove call to sysconf.
+	Use long for R and POS.
+	Use aligned buffer for struct linux_dirent64.
+
 2025-06-03  Werner Koch  <wk@gnupg.org>
 
 	Release 2.0.0.
