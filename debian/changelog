@@ -1,3 +1,9 @@
+gpgme1.0 (2.0.1-1) unstable; urgency=medium
+
+  * new upstream release
+
+ -- meik michalke <meik.michalke@gnupg.com>  Wed, 01 Oct 2025 15:07:44 +0200
+
 gpgme1.0 (2.0.0-1) unstable; urgency=medium
 
   * initial 2.0.0 release, using original Debian packaging by Andreas Meltzer
