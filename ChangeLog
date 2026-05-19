@@ -1,3 +1,335 @@
+2026-05-18  Werner Koch  <wk@gnupg.org>
+
+	Release 2.1.0.
+	+ commit 5bc31cad011192ef5d06304a28f3b8bf1382081c
+
+
+2026-05-18  NIIBE Yutaka  <gniibe@fsij.org>
+
+	io:w32:spawn_sans_helper: Fix inherit of HANDLES to child process.
+	+ commit 168212932fb696db116780a342b23cabbcc1b74e
+	* src/w32-io.c (_gpgme_io_spawn_sans_helper): Inherit HANDLES
+	correctly, even when an argument is not modified.
+
+2026-05-17  Werner Koch  <wk@gnupg.org>
+
+	Support setting attributes for CMS signatures.
+	+ commit 8081d34e5f620a614f58617700f9b473392e6478
+	* src/gpgme.h.in (GPGME_SIG_NOTATION_UNPROTECTED): New.
+	(struct _gpgme_sig_notation): Add field 'unprotected'.
+	* src/sig-notation.c (sig_notation_set_flags): Set flag.
+	* src/engine-gpgsm.c (gpgsm_sign): Implement setting of notations.
+
+	* tests/run-support.h: Add conversion macros.
+	* tests/run-sign.c (struct mystringlist_s): New.
+	(xmalloc): New.
+	(xstrtokenize): New.
+	(print_result): Add arg fp and adjust callers.
+	(main): Add options --binary and --notation.
+
+2026-05-15  NIIBE Yutaka  <gniibe@fsij.org>
+
+	engine:gpgconf: Increase the buffer size.
+	+ commit c848e90334ed08fad0b679fdd02c26a9cc44e907
+	* src/engine-gpgconf.c (gpgconf_read): Update to 2048.
+
+	w32:tests: Use pinentry executable instead of script.
+	+ commit 45ccb2fa0ee4613a5327a8d7cddd060be4fbeec1
+	* tests/gpg/pinentry: Remove.
+	* tests/gpg/pinentry.c: New.
+	* tests/gpg/Makefile.am (EXTRA_DIST): Remove pinentry script.
+	(noinst_PROGRAMS): Add pinentry executable and its rules to build.
+	* tests/json/Makefile.am (gpg-agent.conf): Use pinentry executable.
+
+2026-05-14  NIIBE Yutaka  <gniibe@fsij.org>
+
+	w32:tests: Fix Makefiles and start-stop-agent for EXEEXT.
+	+ commit 1291cfe1c14ea2b015a8cec7b4b60d1e234b49d8
+	* tests/gpg/Makefile.am: Care about EXEEXT.
+	* tests/gpgsm/Makefile.am: Likewise.
+	* tests/json/Makefile.am: Likewise.
+	* tests/start-stop-agent: Use EXEEXT.  Handle \r correctly.
+
+	w32: Add cast for assuan_fd_t.
+	+ commit 11eaae97fa79bfcbced89a8fbf76092eb35dfa4f
+	* src/assuan-support.c (my_pipe, my_close, my_read, my_write, my_spawn)
+	(my_socketpair, my_connect): Cast assuan_fd_t between int.
+	* src/engine-assuan.c (start): Likewise.
+	* src/engine-g13.c (start): Likewise.
+	* src/engine-gpgsm.c (gpgsm_new, prepare): Likewise.
+
+2026-05-11  Werner Koch  <wk@gnupg.org>
+
+	Make GPGME_DECRYPT_SESSION_HASH also work for gnupg 2.2.55.
+	+ commit a05c27e670b72c9afe5dee38b2c5bb02654d7f52
+	* src/engine-gpg.c (have_usable_session_hash): New.
+	(gpg_decrypt): Use here.
+
+2026-04-23  Werner Koch  <wk@gnupg.org>
+
+	New decryption flag GPGME_DECRYPT_SESSION_HASH.
+	+ commit 63f18298d3f5c5f7551301b1e183890c503c644a
+	* src/gpgme.h.in (_gpgme_op_decrypt_result): Add field session_hash.
+	(gpgme_decrypt_flags_t): Add flag GPGME_DECRYPT_SESSION_HASH.
+	(gpgme_status_code_t): Add flags GPGME_STATUS_SESSION_HASH.
+	* src/status-table.c (status_table): Add "SESSION_HASH".
+	* src/decrypt.c (release_op_data): Free new field.
+	(_gpgme_decrypt_status_handler): Handle new status code.
+	* src/engine-gpg.c (gpg_decrypt): Implement
+	  GPGME_DECRYPT_SESSION_HASH.
+
+	* tests/run-decrypt.c (print_result): Print session_hash.
+	(main): Add option --show-session-hash.
+
+	indent: Align a debug output.
+	+ commit b96968f7a9676359d8439570ef89957fede285e7
+	* src/dirinfo.c (get_gpgconf_item): Add blanks to a string.
+
+2026-04-21  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Add flag fields is_de_vs and beta_compliance to encryption results.
+	+ commit 2100e1fbdfeb9ecda00787032a8256938a113dde
+	* src/encrypt.c (_gpgme_encrypt_status_handler): Handle the compliance
+	status line.
+	* src/gpgme.h.in (struct _gpgme_op_encrypt_result): Add fields is_de_vs
+	and beta_compliance.
+	(gpgme_status_code_t): Add status code for the encryption compliance
+	status line.
+	* src/status-table.c (status_table): Add encryption compliance status
+	line.
+
+	* tests/run-encrypt.c (print_encrypt_result): Print compliance.
+
+2026-03-24  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	gpgsm: Read all pending lines before waiting for more data.
+	+ commit 775e1eb923fa0f2f66363d5329acfebc13c864b3
+	* src/engine-gpgsm.c (gpgsm_assuan_simple_command): Add a loop to read
+	all pending lines.
+
+2026-03-18  NIIBE Yutaka  <gniibe@fsij.org>
+
+	Fix passphrase cancel handling.
+	+ commit 8b89678aed6dcc87eff15c9a468b3e8a6a8600d0
+	* src/passphrase.c (op_data_t): Add "canceled" field.
+	(_gpgme_passphrase_status_handler): Mark "canceled" when it sees
+	GPGME_STATUS_CANCELED_BY_USER.  Reset at
+	GPGME_STATUS_PINENTRY_LAUNCHED.  Return GPG_ERR_CANCELED when
+	"canceled" is marked at GPGME_STATUS_EOF.
+
+2026-03-10  NIIBE Yutaka  <gniibe@fsij.org>
+
+	Handle the case when pinentry is invoked multiple times.
+	+ commit 53c8f29125ff9664120879b78fb11a6e766f89f4
+	* src/passphrase.c (_gpgme_passphrase_status_handler): Reset
+	no_passphrase and bad_passphrase field.
+
+2026-02-05  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Don't cap ISO dates beyond year 2037 on Windows.
+	+ commit 021927f2f7be962d2549c978c262edd3f5c2da58
+	* src/conversion.c (_gpgme_parse_timestamp): On Windows, disable hack
+	for 32-bit time_t.
+
+2026-01-28  Collin Funk  <collin.funk1@gmail.com>
+
+	Fix build with libassuan 2.
+	+ commit e4623a83adf401b2758a150233e1513885f3dea6
+	* src/assuan-support.c: Include util.h for the assuan_pid_t
+	definition.
+
+2026-01-15  NIIBE Yutaka  <gniibe@fsij.org>
+
+	build: Update build-aux and m4 from libgpg-error and libassuan.
+	+ commit 9e4e122097b491c2050b0e7993b19ec6de8be104
+	* build-aux/compile, build-aux/depcomp, build-aux/ltmain.sh: Update.
+	* build-aux/mdate-sh, build-aux/missing: Likewise.
+	* m4/gpg-error.m4, m4/libassuan.m4, m4/ltoptions.m4: Likewise.
+	* m4/ltsugar.m4, m4/ltversion.m4, m4/lt~obsolete.m4: Likewise.
+
+2026-01-14  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Allow setting export filters when exporting keys.
+	+ commit 1823e06216f2e9eee302ae1233d635a4a92c03f6
+	* src/context.h (struct gpgme_context): New field export_filter.
+	* src/engine-backend.h (struct engine_ops): Add arg export_filter to
+	field 'export' and field 'export_ext'.
+	* src/engine-gpg.c (export_common): Add arg export_filter and pass
+	option --export-filter with argument value to gpg.
+	(gpg_export, gpg_export_ext): Add arg export_filter and pass it to
+	export_common. Adjust all callers of the two functions.
+	* src/engine-gpgsm.c (gpgsm_export, gpgsm_export_ext): Add dummy arg
+	export_filter.
+	* src/gpgme.c (gpgme_release): Free 'export_filter'.
+	(gpgme_set_ctx_flag, gpgme_get_ctx_flag): New flag "export-filter".
+
+	* tests/run-export.c (main): Add option --export-filter.
+
+2026-01-09  NIIBE Yutaka  <gniibe@fsij.org>
+
+	tests: It's start-stop-agent which invokes gpg-agent.
+	+ commit 9a1f409499c4e086e95c8dbca712929ee3c418ef
+	* tests/gpgsm/Makefile.am (gpgsm.conf): Don't touch agent-program.
+	* tests/start-stop-agent: Don't modify gpg.conf and gpgsm.conf.
+
+	w32:spawn: Support the case without no helper.
+	+ commit 64f80903ec9bc8897f9b2dcebb7068c02ff9ae07
+	* src/w32-io.c (_gpgme_io_spawn_sans_helper): New.
+	(_gpgme_io_spawn): Use _gpgme_io_spawn_sans_helper.
+
+2026-01-08  NIIBE Yutaka  <gniibe@fsij.org>
+
+	w32: Use SetHandleInformation for _gpgme_io_pipe.
+	+ commit 58c57b25575c83f372deee64d67e359ec1afb5c9
+	* src/w32-io.c (_gpgme_io_pipe): Create a pipe with bInheritHandle =
+	TRUE, and then clear an end by SetHandleInformation.
+
+	w32: Fix for process handle.
+	+ commit dd559a6b142f672b8a633b89791349772208d9b8
+	* src/assuan-support.c (my_waitpid): Call __assuan_waitpid for
+	libassuan 3.
+	* src/w32-io.c (_gpgme_io_spawn): Use process handle for libassuan 3.
+
+2025-12-25  NIIBE Yutaka  <gniibe@fsij.org>
+
+	tests:gpg: Use GPGME_PINENTRY_MODE_LOOPBACK for tests.
+	+ commit 538d7cd52b809fcd77a554f04cd2c8ac8915732c
+	* tests/gpg/t-decrypt-verify.c (main): Call gpgme_set_pinentry_mode.
+	* tests/gpg/t-decrypt.c (main): Likewise.
+	* tests/gpg/t-edit-sign.c (main): Likewise.
+	* tests/gpg/t-edit.c (main): Likewise.
+	* tests/gpg/t-encrypt-mixed.c (main): Likewise.
+	* tests/gpg/t-encrypt-sign.c (main): Likewise.
+	* tests/gpg/t-encrypt-sign.c (main): Likewise.
+	* tests/gpg/t-encrypt-sym.c (main): Likewise.
+	* tests/gpg/t-file-name.c (main): Likewise.
+	* tests/gpg/t-sig-notation.c (main): Likewise.
+	* tests/gpg/t-sign.c (main): Likewise.
+	* tests/gpg/t-signers.c (main): Likewise.
+	* tests/gpg/t-thread1.c (main): Likewise.
+	* tests/gpg/Makefile.am (gpg-agent.conf): We use the passphrase_cb.
+
+2025-12-24  NIIBE Yutaka  <gniibe@fsij.org>
+
+	w32: Fix debug print on 64-bit machine.
+	+ commit 11a8ef0e26bfaa6c76b48ff203fd9d85350f326b
+	* src/w32-io.c (release_hddesc): Cast SOCKET to (void *) and use %p.
+	(reader, create_reader, destroy_reader, writer): Likewise.
+	(create_writer, find_writer): Likewise.
+	(_gpgme_io_socket): Likewise.  Add "z" modifier for NFDS.
+
+2025-12-23  NIIBE Yutaka  <gniibe@fsij.org>
+
+	w32: Fix spawn for 64-bit machine.
+	+ commit 936015d49c389a6cafc40025f7881625ded90120
+	* src/priv-io.h (struct spawn_fd_item_s): Use HANDLE for peer_name
+	field.
+	* src/dirinfo.c (read_gpgconf_dirs): Use ASSUAN_INVALID_FD for default
+	value for peer_name field of CFD.
+	* src/engine-gpgconf.c (gpgconf_read, gpgconf_write)
+	(gpgconf_query_swdb): Likewise.
+	* src/version.c (_gpgme_get_program_version): Likewise.
+	* src/w32-io.c (handle_to_fd): Remove.
+	(_gpgme_io_spawn): Assign HD to the peer_name field.  Use %p for
+	printing the value of peer_name field.
+	* src/gpgme-w32spawn.c (my_spawn): Use peer_name field with no cast.
+	Use %p for printing the value of peer_name field.  Remove wrong
+	CloseHandle calls.
+	(translate_get_from_file): Use HANDLE type for the TO variable.
+	Use strtoull on 64-bit machine.  Use ASSUAN_INVALID_FD.
+
+2025-12-22  NIIBE Yutaka  <gniibe@fsij.org>
+
+	Fix a regression wrt the auto-key-locate option.
+	+ commit d242561dae2699aaa8eb88a1a7ce7a1033471eb0
+	* src/keylist.c (gpgme_get_key): Don't call gpgme_set_ctx_flag when
+	it's "".
+
+	tests:w32: Use Sleep instead of _sleep.
+	+ commit 5252c63ecae536d3923859f282e349e1dcd38529
+	* tests/gpg/t-wait.c [HAVE_W32_SYSTEM] (sleep): Use Sleep.
+
+2025-12-15  NIIBE Yutaka  <gniibe@fsij.org>
+
+	Fix function prototypes to match ones in libassuan.
+	+ commit 527c7fff9679afe08927943b9da654e27e75ba93
+	* src/assuan-support.c (my_read, my_write): Use ssize_t.
+	(my_socket, my_connect): Use int instead of assuan_fd_t for older
+	libassuan.
+	* tests/gpg/t-encrypt-large.c (read_cb, write_cb): Use gpgme_ssize_t.
+
+	Fix build with libassuan 2.
+	+ commit 77b9e1de7d7614e8e7eb79f507a1de292efb30a7
+	* src/util.h (assuan_pid_t): Typedef if not available.
+
+2025-12-11  NIIBE Yutaka  <gniibe@fsij.org>
+
+	Fix portability for the use of the assuan types.
+	+ commit 46938bdde47579786c79770eb54b9b742a1e0365
+	* src/assuan-support.c (my_spawn, my_waitpid): Use assuan_pid_t.
+	(my_socket, my_connect): Use assuan_fd_t.
+	* src/engine-gpg.c (start): Remove unused PID.
+	* src/engine-spawn.c (engspawn_start): Likewise.
+	* src/gpgme-w32spawn.c: Add util.h for assuan types.
+	* src/version.c: Likewise.
+	* src/wait-user.c: Likewise.
+	* src/posix-io.c (_gpgme_io_spawn): Use assuan_pid_t.
+	* src/priv-io.h (_gpgme_io_spawn): Likewise.
+	* src/w32-io.c (_gpgme_io_spawn): Likewise.
+	* src/wait-private.c: Include util.h earlier.
+
+	w32: Add a cast for GetProcAddress, add AM_CFLAGS for w32spawn.
+	+ commit 5fa2e405807dec8f88e9a8a25ab381820631a078
+	* src/Makefile.am (gpgme_w32spawn_CFLAGS): Add AM_CFLAGS.
+	* src/gpgme-w32spawn.c (my_spawn): GetProcAddress returns an address
+	for the symbol.  The correctness should be checked by human when
+	writing the code (not by the function prototype).
+
+2025-12-05  NIIBE Yutaka  <gniibe@fsij.org>
+
+	Avoid K&R-style function definition.
+	+ commit 8b8dbd55c03a21feeac55359b56f5157a6225d33
+	* src/stpcpy.c (__stpcpy): Supply function prototype.
+
+2025-11-14  Werner Koch  <wk@gnupg.org>
+
+	Treat empty DISPLAY envvar as unset.
+	+ commit 94fa3c2b25a1979bb838c7d9f9f74375072f4efe
+	* src/engine-gpg.c (gpg_new): Do not pass option --display if DISPLAY
+	is set to the empty string.
+	* src/engine-gpgsm.c (gpgsm_new): Likewiese for sending the display
+	option.
+	* src/engine-g13.c (g13_new): Ditto.
+	* src/engine-assuan.c (llass_new): Ditto.
+	* src/engine-uiserver.c (uiserver_new): Ditto.
+
+2025-11-10  Giacomo Tesio  <giacomo@tesio.it>
+
+	gpgme_get_key: respect caller's ctx configuration.
+	+ commit 964bc14ccfba84b050c20dc5035414438b10bd74
+
+
+2025-10-29  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	doc: Clarify that keygrip lists multiple keygrips for combined algos.
+	+ commit 2360b937cf8f9bc52655e45dccd1885dd4c7ac32
+	* doc/gpgme.texi (section Data type gpgme_subkey_t): Amend documentation
+	of keygrip member.
+	* src/gpgme.h.in (_gpgme_subkey): Ditto.
+
+2025-10-27  Werner Koch  <wk@gnupg.org>
+
+	Improve tracing for engine-gpgsm.
+	+ commit eba8776a3f590d964430e515a030145236c0da33
+	* src/engine-gpgsm.c (gpgsm_assuan_simple_command): More tracing
+	calls.
+
+2025-09-25  NIIBE Yutaka  <gniibe@fsij.org>
+
+	build: Avoid using -o for test(1).
+	+ commit 5517c5fe3da6eab1ccddea6fbd7fde1aefdab25c
+	* configure.ac: Use || in shell level, instead of -o of test.
+
 2025-09-23  Werner Koch  <wk@gnupg.org>
 
 	Release 2.0.1.

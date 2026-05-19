@@ -38,6 +38,7 @@
 #include <sys/wait.h>
 #endif
 
+#include "util.h"
 #include "assuan.h"
 
 #include "gpgme.h"
@@ -109,8 +110,8 @@ my_pipe (assuan_context_t ctx, assuan_fd_t fds[2], int inherit_idx)
   res = _gpgme_io_pipe (gfds, inherit_idx);
 
   /* For now... */
-  fds[0] = (assuan_fd_t) gfds[0];
-  fds[1] = (assuan_fd_t) gfds[1];
+  fds[0] = (assuan_fd_t)(intptr_t) gfds[0];
+  fds[1] = (assuan_fd_t)(intptr_t) gfds[1];
 
   return res;
 }
@@ -122,23 +123,23 @@ static int
 my_close (assuan_context_t ctx, assuan_fd_t fd)
 {
   (void)ctx;
-  return _gpgme_io_close ((int) fd);
+  return _gpgme_io_close ((int)(intptr_t) fd);
 }
 
 
-static gpgme_ssize_t
+static ssize_t
 my_read (assuan_context_t ctx, assuan_fd_t fd, void *buffer, size_t size)
 {
   (void)ctx;
-  return _gpgme_io_read ((int) fd, buffer, size);
+  return _gpgme_io_read ((int)(intptr_t) fd, buffer, size);
 }
 
 
-static gpgme_ssize_t
+static ssize_t
 my_write (assuan_context_t ctx, assuan_fd_t fd, const void *buffer, size_t size)
 {
   (void)ctx;
-  return _gpgme_io_write ((int) fd, buffer, size);
+  return _gpgme_io_write ((int)(intptr_t) fd, buffer, size);
 }
 
 
@@ -181,7 +182,7 @@ my_sendmsg (assuan_context_t ctx, assuan_fd_t fd, const assuan_msghdr_t msg,
    to reflect the value of the FD in the peer process (on
    Windows).  */
 static int
-my_spawn (assuan_context_t ctx, pid_t *r_pid, const char *name,
+my_spawn (assuan_context_t ctx, assuan_pid_t *r_pid, const char *name,
 	  const char **argv,
 	  assuan_fd_t fd_in, assuan_fd_t fd_out,
 	  assuan_fd_t *fd_child_list,
@@ -219,20 +220,20 @@ my_spawn (assuan_context_t ctx, pid_t *r_pid, const char *name,
     {
       while (fd_child_list[i] != ASSUAN_INVALID_FD)
 	{
-	  fd_items[i].fd = (int) fd_child_list[i];
+	  fd_items[i].fd = (int)(intptr_t) fd_child_list[i];
 	  fd_items[i].dup_to = -1;
 	  i++;
 	}
     }
   if (fd_in != ASSUAN_INVALID_FD)
     {
-      fd_items[i].fd = (int) fd_in;
+      fd_items[i].fd = (int)(intptr_t) fd_in;
       fd_items[i].dup_to = 0;
       i++;
     }
   if (fd_out != ASSUAN_INVALID_FD)
     {
-      fd_items[i].fd = (int) fd_out;
+      fd_items[i].fd = (int)(intptr_t) fd_out;
       fd_items[i].dup_to = 1;
       i++;
     }
@@ -309,17 +310,22 @@ my_spawn (assuan_context_t ctx, pid_t *r_pid, const char *name,
 
 
 /* If action is 0, like waitpid.  If action is 1, just release the PID?  */
-static pid_t
-my_waitpid (assuan_context_t ctx, pid_t pid,
+static assuan_pid_t
+my_waitpid (assuan_context_t ctx, assuan_pid_t pid,
 	    int nowait, int *status, int options)
 {
-  (void)ctx;
 #ifdef HAVE_W32_SYSTEM
+# if ASSUAN_VERSION_NUMBER < 0x030000
+  (void)ctx;
   (void)nowait;
   (void)status;
   (void)options;
   (void)pid;  /* Just a number without a kernel object.  */
+# else
+  return __assuan_waitpid (ctx, pid, nowait, status, options);
+# endif
 #else
+  (void)ctx;
   /* We can't just release the PID, a waitpid is mandatory.  But
      NOWAIT in POSIX systems just means the caller already did the
      waitpid for this child.  */
@@ -351,6 +357,25 @@ my_socketpair (assuan_context_t ctx, int namespace, int style,
 }
 
 
+#if ASSUAN_VERSION_NUMBER >= 0x030000
+static assuan_fd_t
+my_socket (assuan_context_t ctx, int namespace, int style, int protocol)
+{
+  int r = _gpgme_io_socket (namespace, style, protocol);
+
+  (void)ctx;
+  return (assuan_fd_t)(intptr_t)r;
+}
+
+
+static int
+my_connect (assuan_context_t ctx, assuan_fd_t sock, struct sockaddr *addr,
+	    socklen_t length)
+{
+  (void)ctx;
+  return _gpgme_io_connect ((int)(intptr_t)sock, addr, length);
+}
+#else
 static int
 my_socket (assuan_context_t ctx, int namespace, int style, int protocol)
 {
@@ -366,6 +391,7 @@ my_connect (assuan_context_t ctx, int sock, struct sockaddr *addr,
   (void)ctx;
   return _gpgme_io_connect (sock, addr, length);
 }
+#endif
 
 
 /* Note for Windows: Ignore the incompatible pointer type warning for

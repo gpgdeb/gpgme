@@ -438,6 +438,15 @@ have_usable_gpgtar (engine_gpg_t gpg)
 
 
 static int
+have_usable_session_hash (engine_gpg_t gpg)
+{
+  return have_gpg_version (gpg, "2.5.19")
+         || (have_gpg_version (gpg, "2.2.55")
+             && !have_gpg_version (gpg, "2.3.0"));
+}
+
+
+static int
 have_option_proc_all_sigs (engine_gpg_t gpg)
 {
   static unsigned int flag;
@@ -697,7 +706,7 @@ gpg_new (void **engine, const char *file_name, const char *home_dir,
   rc = _gpgme_getenv ("DISPLAY", &dft_display);
   if (rc)
     goto leave;
-  if (dft_display)
+  if (dft_display && *dft_display)
     {
       rc = add_gpg_arg_with_value (gpg, "--display=", dft_display, 0);
 
@@ -705,6 +714,8 @@ gpg_new (void **engine, const char *file_name, const char *home_dir,
       if (rc)
 	goto leave;
     }
+  else
+    free (dft_display);
 
   rc = _gpgme_getenv ("GPG_TTY", &env_tty);
   if (isatty (1) || env_tty || rc)
@@ -1750,7 +1761,6 @@ start (engine_gpg_t gpg)
   int i, n;
   int status;
   struct spawn_fd_item_s *fd_list;
-  pid_t pid;
   const char *pgmname;
 
   if (!gpg)
@@ -1847,7 +1857,7 @@ start (engine_gpg_t gpg)
 
   status = _gpgme_io_spawn (pgmname, gpg->argv,
                             (IOSPAWN_FLAG_DETACHED |IOSPAWN_FLAG_ALLOW_SET_FG),
-                            fd_list, NULL, NULL, &pid);
+                            fd_list, NULL, NULL, NULL);
   {
     int saved_err = gpg_error_from_syserror ();
     free (fd_list);
@@ -1973,8 +1983,16 @@ gpg_decrypt (void *engine,
         err = add_arg (gpg, "--unwrap");
     }
 
-  if (!err && (flags & GPGME_DECRYPT_LISTONLY))
+  if (!err && (flags & GPGME_DECRYPT_LISTONLY)
+           && !(flags & GPGME_DECRYPT_SESSION_HASH))
     err = add_arg (gpg, "--list-only");
+
+  if (!err && (flags & GPGME_DECRYPT_SESSION_HASH)
+      && have_usable_session_hash (gpg))
+    err = add_arg (gpg,
+                   (flags & GPGME_DECRYPT_LISTONLY)? "--show-only-session-hash"
+                   /* */                           : "--show-session-hash");
+
 
   if (!err && export_session_key)
     err = add_gpg_arg (gpg, "--show-session-key");
@@ -2782,7 +2800,8 @@ gpg_encrypt_sign (void *engine, gpgme_key_t recp[],
 
 static gpgme_error_t
 export_common (engine_gpg_t gpg, gpgme_export_mode_t mode,
-               gpgme_data_t keydata, int use_armor)
+               gpgme_data_t keydata, const char *export_filter,
+               int use_armor)
 {
   gpgme_error_t err = 0;
 
@@ -2796,6 +2815,12 @@ export_common (engine_gpg_t gpg, gpgme_export_mode_t mode,
   if ((mode & GPGME_EXPORT_MODE_MINIMAL))
     {
       err = add_arg (gpg, "--export-options=export-minimal");
+    }
+  if (!err && export_filter && have_gpg_version (gpg, "2.1.14"))
+    {
+      err = add_arg (gpg, "--export-filter");
+      if (!err)
+      err = add_arg (gpg, export_filter);
     }
 
   if (err)
@@ -2835,12 +2860,12 @@ export_common (engine_gpg_t gpg, gpgme_export_mode_t mode,
 
 static gpgme_error_t
 gpg_export (void *engine, const char *pattern, gpgme_export_mode_t mode,
-	    gpgme_data_t keydata, int use_armor)
+	    gpgme_data_t keydata, const char *export_filter, int use_armor)
 {
   engine_gpg_t gpg = engine;
   gpgme_error_t err;
 
-  err = export_common (gpg, mode, keydata, use_armor);
+  err = export_common (gpg, mode, keydata, export_filter, use_armor);
 
   if (!err && pattern && *pattern)
     err = add_arg (gpg, pattern);
@@ -2854,12 +2879,12 @@ gpg_export (void *engine, const char *pattern, gpgme_export_mode_t mode,
 
 static gpgme_error_t
 gpg_export_ext (void *engine, const char *pattern[], gpgme_export_mode_t mode,
-		gpgme_data_t keydata, int use_armor)
+		gpgme_data_t keydata, const char *export_filter, int use_armor)
 {
   engine_gpg_t gpg = engine;
   gpgme_error_t err;
 
-  err = export_common (gpg, mode, keydata, use_armor);
+  err = export_common (gpg, mode, keydata, export_filter, use_armor);
 
   if (pattern)
     {
