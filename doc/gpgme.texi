@@ -2604,7 +2604,7 @@ addresses is not supported.
 
 @deftypefun gpgme_error_t gpgme_set_sender @
       (@w{gpgme_ctx_t @var{ctx}}, @
-       @w{int @var{address}})
+       @w{const char * @var{address}})
 
 @since{1.8.0}
 
@@ -3270,6 +3270,12 @@ the expiration time to use for key signature expiration.  Valid values
 are documented in the GnuPG manual and the gpg man page under
 the option @option{--default-cert-expire}.
 
+@item "export-filter"
+@since{2.0.2}
+The string given in @var{value} is passed to the GnuPG engine to use as
+filter when exporting keys.  Valid values are documented in the GnuPG
+manual and the gpg man page under the option @option{--export-filter}.
+
 @item "key-origin"
 @since{1.16.1}
 The string given in @var{value} is passed to the GnuPG engine to set
@@ -3646,6 +3652,7 @@ This is true if the subkey can be used for qualified signatures
 according to local government regulations.
 
 @item unsigned int is_cardkey : 1
+@since{1.2.0}
 
 This is true if the secret key or subkey is stored on a smart card.
 
@@ -3711,8 +3718,9 @@ hexadecimal digits, if available.
 @item char *keygrip
 @since{1.7.0}
 
-The keygrip of the subkey in hex digit form or @code{NULL} if not
-available.
+The keygrip(s) of the subkey in hex digit form or @code{NULL} if not
+available. For combined algorithms the keygrips are delimited
+by comma.
 
 @item unsigned long int timestamp
 This is the creation timestamp of the subkey.  This is @code{(unsigned
@@ -3722,11 +3730,6 @@ Note that an invalid timestamp indicates a bug in the engine.
 @item unsigned long int expires
 This is the expiration timestamp of the subkey, or 0 if the subkey
 does not expire.
-
-@item unsigned int is_cardkey : 1
-@since{1.2.0}
-
-True if the secret key is stored on a smart card.
 
 @item char *card_number
 @since{1.2.0}
@@ -5872,6 +5875,15 @@ used to information on the keyids of the recipients of some encrypted
 data.  Note that most other result items have no or no useful
 information in this case.
 
+@item GPGME_DECRYPT_SESSION_HASH
+@since{2.1.0}
+
+If supported by gpg (>= 2.5.19) pass the option
+@option{--show-session-hash} to gpg so that the decryption result
+field @code{session_key} will receive the hash of the session key.  If
+@code{GPGME_DECRYPT_LIST} is also set the gpg option
+@option{--show-only-session-key} is used instead.
+
 @end table
 
 The function returns the error codes as described for
@@ -5879,7 +5891,7 @@ The function returns the error codes as described for
 @end deftypefun
 
 @deftypefun gpgme_error_t gpgme_op_decrypt_ext_start ( @
-            @w{gpgme_ctx_t @var{ctx}}, @
+            @w{gpgme_ctx_tng @var{ctx}}, @
             @w{gpgme_decrypt_flags_t @var{flags}}, @
             @w{gpgme_data_t @var{cipher}}, @
             @w{gpgme_data_t @var{plain}})
@@ -5990,6 +6002,15 @@ or @code{gpgme_get_ctx_flag (ctx, "export-session-key")} returns true
 A string with the symmetric encryption algorithm and mode using the
 format "<algo>.<mode>".  Note that the deprecated non-MDC encryption mode of
 OpenPGP is given as "PGPCFB".
+
+@item char *session_hash
+@since{2.1.0}
+
+A textual representation (nul-terminated string) of the SHA-256 hash
+of the session key used in symmetric encryption of the message.  It
+will receive the value @code{NULL} if the feature is not supported by
+the backend or the @code{GPGME_DECRYPT_SESSION_HASH} bit was not set
+in flags argument of the decryption function.
 
 @end table
 @end deftp
@@ -6154,6 +6175,13 @@ notation data is in human readable form
 The @code{GPGME_SIG_NOTATION_CRITICAL} symbol specifies that the
 notation data is critical.
 
+@item GPGME_SIG_NOTATION_UNPROTECTED
+@since{2.1.0}
+
+The @code{GPGME_SIG_NOTATION_UNPROTECTED} symbol is used with CMS
+signatures to indicate that an attribute is unsigned or shall be
+created as unsigned.
+
 @end table
 
 @item unsigned int human_readable : 1
@@ -6164,6 +6192,10 @@ not for policy URLs.
 @item unsigned int critical : 1
 This is true if the @code{GPGME_SIG_NOTATION_CRITICAL} flag is set and
 false otherwise.  This flag is valid for notation data and policy URLs.
+
+@item unsigned int unprotected : 1
+This is true if the @code{GPGME_SIG_NOTATION_UNPROTECTED} flag is set and
+false otherwise.  This flag is currently only used for CMS attributes.
 
 @end table
 @end deftp
@@ -6690,7 +6722,8 @@ context.
 
 Using the following functions, you can attach arbitrary notation data
 to a signature.  This information is then available to the user when
-the signature is verified.
+the signature is verified.  The functions may also be used for CMS to
+add signed or unsigned attributes to data signatures.
 
 @deftypefun void gpgme_sig_notation_clear (@w{gpgme_ctx_t @var{ctx}})
 @since{1.1.0}
@@ -6720,6 +6753,15 @@ strings in human-readable form.  The flag
 strings must be in UTF-8 encoding.
 
 If @var{name} is @code{NULL}, then @var{value} should be a policy URL.
+
+If this function is used with a GPGME_PROTOCOL_CMS, @var{name} gives
+the OID in decimal-dotted format or it may be one of the system
+attributes denoted by a symbol name prefixed with an underscore
+(e.g. @code{_signingCertificateV2}).  @var{value} needs to be the
+DER value for the attribute encoded in hexified format; for
+a system attribute it may be @code{NULL}.  The flag
+@code{GPGME_SIG_NOTATION_UNPROTECTED} can be used to create an
+unsigned attribute.
 
 The function @code{gpgme_sig_notation_add} returns the error code
 @code{GPG_ERR_NO_ERROR} if the notation data could be added
@@ -7062,6 +7104,16 @@ members:
 @item gpgme_invalid_key_t invalid_recipients
 A linked list with information about all invalid keys for which
 the data could not be encrypted.
+
+@item unsigned int is_de_vs : 1;
+@since{2.1.0}
+The message was encrypted in a VS-NfD compliant way.  This is a
+specification in Germany for a restricted communication level.
+
+@item unsigned int beta_compliance : 1;
+@since{2.1.0}
+The compliance flags (e.g. is_de_vs) are set but the software has not
+yet been approved or is in a beta state.
 @end table
 @end deftp
 

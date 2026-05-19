@@ -268,7 +268,7 @@ g13_new (void **engine, const char *file_name, const char *home_dir,
   err = _gpgme_getenv ("DISPLAY", &dft_display);
   if (err)
     goto leave;
-  if (dft_display)
+  if (dft_display && *dft_display)
     {
       if (gpgrt_asprintf (&optstr, "OPTION display=%s", dft_display) < 0)
         {
@@ -284,6 +284,8 @@ g13_new (void **engine, const char *file_name, const char *home_dir,
       if (err)
 	goto leave;
     }
+  else
+    free (dft_display);
 
   err = _gpgme_getenv ("GPG_TTY", &env_tty);
   if (isatty (1) || env_tty || err)
@@ -670,7 +672,7 @@ start (engine_g13_t g13, const char *command)
     return gpg_error (GPG_ERR_GENERAL);	/* FIXME */
   /* For now... */
   for (i = 0; i < nfds; i++)
-    fdlist[i] = (int) afdlist[i];
+    fdlist[i] = (int)(intptr_t)afdlist[i];
 
   /* We "duplicate" the file descriptor, so we can close it here (we
      can't close fdlist[0], as that is closed by libassuan, and

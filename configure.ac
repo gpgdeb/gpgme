@@ -31,8 +31,8 @@ min_automake_version="1.14"
 # for the LT versions.
 m4_define([mym4_package],[gpgme])
 m4_define([mym4_major], [2])
-m4_define([mym4_minor], [0])
-m4_define([mym4_micro], [1])
+m4_define([mym4_minor], [1])
+m4_define([mym4_micro], [0])
 
 # Below is m4 magic to extract and compute the git revision number,
 # the decimalized short revision number, a beta version string and a
@@ -55,9 +55,9 @@ AC_INIT([mym4_package],[mym4_version],[https://bugs.gnupg.org])
 #   (Interfaces added:			AGE++)
 #   (Interfaces removed:		AGE=0)
 #
-LIBGPGME_LT_CURRENT=45
-LIBGPGME_LT_AGE=0
-LIBGPGME_LT_REVISION=1
+LIBGPGME_LT_CURRENT=46
+LIBGPGME_LT_AGE=1
+LIBGPGME_LT_REVISION=0
 ################################################
 
 AC_SUBST(LIBGPGME_LT_CURRENT)
@@ -334,7 +334,7 @@ AC_ARG_ENABLE([languages],
                              tr ',:' '  ' | tr '[A-Z]' '[a-z]'`],
                              [enabled_languages="maybe"])
 if test "x$enabled_languages" = "x" \
-   -o "$enabled_languages" = "no"; then
+   || test "$enabled_languages" = "no"; then
    enabled_languages=
 fi
 
@@ -553,7 +553,7 @@ fi
 # Try to find a thread-safe version of getenv().
 have_thread_safe_getenv=no
 jm_GLIBC21
-if test $GLIBC21 = yes -o $have_w32_system = yes; then
+if test $GLIBC21 = yes || test $have_w32_system = yes; then
   have_thread_safe_getenv=yes
 fi
 if test $have_thread_safe_getenv = yes; then

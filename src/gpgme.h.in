@@ -428,6 +428,7 @@ typedef unsigned int gpgme_export_mode_t;
 /* The available signature notation flags.  */
 #define GPGME_SIG_NOTATION_HUMAN_READABLE	1
 #define GPGME_SIG_NOTATION_CRITICAL		2
+#define GPGME_SIG_NOTATION_UNPROTECTED          4
 
 typedef unsigned int gpgme_sig_notation_flags_t;
 
@@ -508,8 +509,11 @@ struct _gpgme_sig_notation
   /* Notation data is critical.  */
   unsigned int critical : 1;
 
+  /* Notaion data is unprotected (unsigned).  */
+  unsigned int unprotected : 1;
+
   /* Internal to GPGME, do not use.  */
-  int _unused : 30;
+  int _unused : 29;
 };
 
 
@@ -664,7 +668,8 @@ struct _gpgme_subkey
    * string for composite algorithms, or NULL.  */
   char *curve;
 
-  /* The keygrip of the subkey in hex digit form or NULL if not available.  */
+  /* The keygrip(s) of the subkey in hex digit form or NULL if not available.
+   * For combined algorithms the keygrips are delimited by comma. */
   char *keygrip;
 
   /* For OpenPGP the v5 fpr of a v4 key. For X.509 the SHA256 fingerprint.  */
@@ -1378,6 +1383,16 @@ struct _gpgme_op_encrypt_result
 {
   /* The list of invalid recipients.  */
   gpgme_invalid_key_t invalid_recipients;
+
+  /* True if the message was encrypted in compliance to the de-vs
+   * mode.  */
+  unsigned int is_de_vs : 1;
+
+  /* The compliance mode (is_de_vs) has not yet been approved.  */
+  unsigned int beta_compliance : 1;
+
+  /* Internal to GPGME, do not use.  */
+  int _unused : 30;
 };
 typedef struct _gpgme_op_encrypt_result *gpgme_encrypt_result_t;
 
@@ -1515,6 +1530,10 @@ struct _gpgme_op_decrypt_result
   /* A string with the symmetric encryption algorithm and mode using
    * the format "<algo>.<mode>".  */
   char *symkey_algo;
+
+  /* A string with the hash of the session key or NULL if the hash was
+   * not emitted by the backend.  */
+  char *session_hash;
 };
 typedef struct _gpgme_op_decrypt_result *gpgme_decrypt_result_t;
 
@@ -1529,6 +1548,7 @@ typedef enum
     GPGME_DECRYPT_VERIFY = 1,
     GPGME_DECRYPT_ARCHIVE = 2,
     GPGME_DECRYPT_LISTONLY = 16,
+    GPGME_DECRYPT_SESSION_HASH = 32,
     GPGME_DECRYPT_UNWRAP = 128
   }
 gpgme_decrypt_flags_t;
@@ -2715,7 +2735,9 @@ typedef enum
     GPGME_STATUS_NOTATION_FLAGS = 98,
     GPGME_STATUS_DECRYPTION_COMPLIANCE_MODE = 99,
     GPGME_STATUS_VERIFICATION_COMPLIANCE_MODE = 100,
-    GPGME_STATUS_CANCELED_BY_USER = 101
+    GPGME_STATUS_CANCELED_BY_USER = 101,
+    GPGME_STATUS_ENCRYPTION_COMPLIANCE_MODE = 102,
+    GPGME_STATUS_SESSION_HASH = 103
   }
 gpgme_status_code_t;
 
