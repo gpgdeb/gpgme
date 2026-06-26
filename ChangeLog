@@ -1,3 +1,48 @@
+2026-06-25  Werner Koch  <wk@gnupg.org>
+
+	Release 2.1.1.
+	+ commit c68741376b5561f6a9885819c55922cd189a5172
+
+
+	w32: Use gpgrt_w32_set_errno if gpgrt is new enough.
+	+ commit df6c94f136e5411aabeb3000403f402f2a25092b
+	* src/w32-io.c (_gpgme_io_spawn): Add mapping from Windows error
+	  number.
+	(_gpgme_io_select): Ditto.
+
+2026-06-22  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Trace result of gpgme_op_export.
+	+ commit c2613252133a959bace04f0f78f913029d247e0b
+	* src/export.c (gpgme_op_export): Trace the returned error.
+
+2026-06-22  Werner Koch  <wk@gnupg.org>
+
+	Let gpgme_op_export also return operational errors.
+	+ commit 8dad6c1d1ccd042c5700e7fa07025ce00da590fc
+	* src/export.c (gpgme_op_export): On success check and return
+	  operational errors.
+
+2026-05-21  NIIBE Yutaka  <gniibe@fsij.org>
+
+	json:w32: Add CRLF handling for armored output.
+	+ commit 95d7cdb6b4309ef77f875edaf09a9632268ea1d3
+	* src/json-core.c (make_data_object): Remove CR for CRLF when
+	it's armored output.
+
+2026-05-20  NIIBE Yutaka  <gniibe@fsij.org>
+
+	m4: Deprecate AM_PATH_GPGME_GLIB macro.
+	+ commit 2e02b9d0243d6c27562b01f18bf4976a816af6f6
+	* src/gpgme.m4 (AM_PATH_GPGME_GLIB): Deprecated.
+
+2026-05-19  NIIBE Yutaka  <gniibe@fsij.org>
+
+	w32:io: Serialize the access to ctx->* between reader/writer and io.
+	+ commit 6ef2d2a4d663d566df419058b93cfa52dd24e9af
+	* src/w32-io.c (reader, writer): Protect shared access to ctx->*
+	correctly, by using the internal buffer.
+
 2026-05-18  Werner Koch  <wk@gnupg.org>
 
 	Release 2.1.0.
