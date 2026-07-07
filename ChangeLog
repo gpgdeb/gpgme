@@ -1,3 +1,15 @@
+2026-06-30  Werner Koch  <wk@gnupg.org>
+
+	Release 2.1.2.
+	+ commit 34eaa0a69c120cd1d19365c6b24c58e98cd29cdf
+
+
+2026-06-29  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	w32: Fix typo which broke the build.
+	+ commit 413380c31074dcd7e22062e6cd3f313bfa451200
+	* src/w32-io.c (_gpgme_io_spawn): Replace bogus #else with #endif.
+
 2026-06-25  Werner Koch  <wk@gnupg.org>
 
 	Release 2.1.1.

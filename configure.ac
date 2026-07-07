@@ -32,7 +32,7 @@ min_automake_version="1.14"
 m4_define([mym4_package],[gpgme])
 m4_define([mym4_major], [2])
 m4_define([mym4_minor], [1])
-m4_define([mym4_micro], [1])
+m4_define([mym4_micro], [2])
 
 # Below is m4 magic to extract and compute the git revision number,
 # the decimalized short revision number, a beta version string and a
@@ -57,7 +57,7 @@ AC_INIT([mym4_package],[mym4_version],[https://bugs.gnupg.org])
 #
 LIBGPGME_LT_CURRENT=46
 LIBGPGME_LT_AGE=1
-LIBGPGME_LT_REVISION=1
+LIBGPGME_LT_REVISION=2
 ################################################
 
 AC_SUBST(LIBGPGME_LT_CURRENT)

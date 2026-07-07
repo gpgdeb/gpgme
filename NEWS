@@ -1,3 +1,11 @@
+Noteworthy changes in version 2.1.2 (2026-06-30)   [C46/A1/R2]
+------------------------------------------------
+
+ * w32: Fix a syntax error
+
+ Release-info: https://dev.gnupg.org/T8269
+
+
 Noteworthy changes in version 2.1.1 (2026-06-25)   [C46/A1/R1]
 ------------------------------------------------
 
