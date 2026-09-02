@@ -1,3 +1,75 @@
+2026-08-31  Werner Koch  <wk@gnupg.org>
+
+	Release 2.2.0.
+	+ commit 5c2e9553adda72753d7edc4d755814689968f88e
+
+
+2026-08-05  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	tests: Add test to check issuer serial number and issuer name.
+	+ commit ecffd0c9a7ec00a156443d6d8d253da09c0cf23b
+	* tests/gpgsm/Makefile.am (LDADD): Add @GPG_ERROR_LIBS@.
+	* tests/gpgsm/t-support.h (_test, test, safe_strcmp, nonnull,
+	have_gpgsm_version): New.
+	* tests/gpgsm/cms-decrypt.c (nonnull): Remove.
+	* tests/gpgsm/cms-keylist.c (nonnull): Remove.
+	* tests/gpgsm/t-verify.c (test_opaque_without_cert): New.
+	(check_result): Add arguments issuer_serial, issuer_name. Use
+	safe_strcmp to compare fpr. Check issuer_serial and issuer_name.
+	(main): Add expected issuer serial and issuer name to existing
+	check_result calls. Add test to check S/MIME signature without embedded
+	signing certificate.
+
+	Fix handling of missing timestamp in SIGINFO status.
+	+ commit 8dc1de3acb86375830e7034cab419030bdf1d36b
+	* src/verify.c (parse_sig_info): Add argument protocol. Check for "-"
+	if protocol is CMS.
+	(_gpgme_verify_status_handler): Pass protocol to parse_sig_info.
+
+	* tests/gpg/t-verify.c (check_result): Add argument timestamp. Check
+	timestamp.
+	(main): Add expected timestamp to all check_result calls.
+	* tests/gpgsm/t-verify.c (check_result): Add argument timestamp. Check
+	timestamp.
+	(main): Add expected timestamp to all check_result calls.
+
+2026-08-03  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Provide serial number and issuer of unknown S/MIME signing certificates.
+	+ commit 7ba3ef8e40518ec109b6e0551ac3cc076c95b53f
+	* src/gpgme.h.in (_gpgme_signature): Add fields issuer_serial and
+	issuer_name.
+	* src/verify.c (release_op_data): Free new fields.
+	(parse_no_pubkey): New.
+	(_gpgme_verify_status_handler): Handle NO_PUBKEY status code.
+
+	* tests/run-verify.c (print_result): Print issuer_serial and
+	issuer_name.
+
+	Add helper to decode percent-plus encoded strings.
+	+ commit 667ced56862ec5d50dd17e98aa26155cc2330ac3
+	* src/conversion.c (do_decode_percent_or_percent_plus): New.
+	(_gpgme_decode_percent_string): Move its code to new file-static
+	do_decode_percent_or_percent_plus and call it with disabled decoding of
+	'+'.
+	* src/conversion.c, src/util.h (_gpgme_decode_percent_plus_string): New.
+
+2026-07-30  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Handle new SIGINFO status line.
+	+ commit 31eb884e8f102ed3cf1220ccdd77e6e1931a9a7b
+	* src/gpgme.h.in (gpgme_status_code_t): Add status code for SIGINFO.
+	* src/status-table.c (status_table): Add "SIGINFO".
+	* src/verify.c (parse_sig_info): New.
+	(_gpgme_verify_status_handler): Handle SIGINFO status line.
+
+2026-07-09  Ingo Klöcker  <dev@ingo-kloecker.de>
+
+	Ignore TRUST_ status lines if no NEWSIG was seen.
+	+ commit 4cb1906c1c47ce2c8b7180bc31ffdb1af4b5ffe8
+	* src/verify.c (_gpgme_verify_status_handler): Don't return error if
+	TRUST_* status line is seen before NEWSIG status line has been seen.
+
 2026-06-30  Werner Koch  <wk@gnupg.org>
 
 	Release 2.1.2.
