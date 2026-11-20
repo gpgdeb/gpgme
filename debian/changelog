@@ -1,3 +1,9 @@
+gpgme1.0 (2.3.1-1) unstable; urgency=medium
+
+  * new upstream release
+
+ -- meik michalke <meik.michalke@gnupg.com>  Fri, 20 Nov 2026 10:34:20 +0100
+
 gpgme1.0 (2.2.0-1) unstable; urgency=medium
 
   * new upstream release
