@@ -75,10 +75,6 @@ release_op_data (void *hook)
 	free (sig->pka_address);
       if (sig->key)
         gpgme_key_unref (sig->key);
-      if (sig->issuer_serial)
-	free (sig->issuer_serial);
-      if (sig->issuer_name)
-	free (sig->issuer_name);
       free (sig);
       sig = next;
     }
@@ -486,27 +482,6 @@ parse_valid_sig (gpgme_signature_t sig, char *args, gpgme_protocol_t protocol)
 	    }
 	}
     }
-  return 0;
-}
-
-
-static gpgme_error_t
-parse_sig_info (gpgme_signature_t sig, char *args, gpgme_protocol_t protocol)
-{
-  char *end = args;
-  char *tail;
-
-  if (!*args)
-    /* We require at least the creation time.  */
-    return gpg_error (GPG_ERR_GENERAL);
-
-  if ((protocol == GPGME_PROTOCOL_CMS) && (*args == '-'))
-    return 0;
-
-  sig->timestamp = _gpgme_parse_timestamp (end, &tail);
-  if (sig->timestamp == -1 || end == tail || (*tail && *tail != ' '))
-    return trace_gpg_error (GPG_ERR_INV_ENGINE);
-
   return 0;
 }
 
@@ -951,49 +926,6 @@ parse_error (gpgme_signature_t sig, char *args, int set_status)
 }
 
 
-static gpgme_error_t
-parse_no_pubkey (gpgme_signature_t sig, char *args, gpgme_protocol_t protocol)
-{
-  gpgme_error_t err;
-  char *end;
-  char *name;
-
-  if (protocol != GPGME_PROTOCOL_CMS)
-    return 0;
-
-  /* Check that we only get one of these status codes per
-     signature; if not the crypto backend misbehaves.  */
-  if (sig->issuer_serial || sig->issuer_name)
-    return trace_gpg_error (GPG_ERR_INV_ENGINE);
-
-  /* Parse #serialno/issuer */
-  end = strchr (args, ' ');
-  if (end)
-    *end = '\0';
-
-  if (*args != '#')
-    return trace_gpg_error (GPG_ERR_INV_ENGINE);
-  args++;
-
-  name = strchr (args, '/');
-  if (name)
-    {
-      *name = '\0';
-      name++;
-    }
-  if (!name || !*args || !*name)
-    return trace_gpg_error (GPG_ERR_INV_ENGINE);
-
-  err = _gpgme_decode_percent_plus_string (args, &sig->issuer_serial, 0, 0);
-  if (err)
-    return err;
-
-  err = _gpgme_decode_percent_plus_string (name, &sig->issuer_name, 0, 0);
-
-  return err;
-}
-
-
 gpgme_error_t
 _gpgme_verify_status_handler (void *priv, gpgme_status_code_t code, char *args)
 {
@@ -1037,11 +969,6 @@ _gpgme_verify_status_handler (void *priv, gpgme_status_code_t code, char *args)
       return sig ? parse_valid_sig (sig, args, ctx->protocol)
 	: trace_gpg_error (GPG_ERR_INV_ENGINE);
 
-    case GPGME_STATUS_SIGINFO:
-      opd->only_newsig_seen = 0;
-      return sig ? parse_sig_info (sig, args, ctx->protocol)
-	: trace_gpg_error (GPG_ERR_INV_ENGINE);
-
     case GPGME_STATUS_NODATA:
       opd->only_newsig_seen = 0;
       if (!sig)
@@ -1069,14 +996,9 @@ _gpgme_verify_status_handler (void *priv, gpgme_status_code_t code, char *args)
     case GPGME_STATUS_TRUST_MARGINAL:
     case GPGME_STATUS_TRUST_FULLY:
     case GPGME_STATUS_TRUST_ULTIMATE:
-      /* In de-vs compliance mode TRUST_ status is emitted during
-       * decryption if validation of the encryption certificate
-       * fails.  Silently, ignore such a status line if no NEWSIG
-       * was seen.  */
-      if (!sig)
-        break;
       opd->only_newsig_seen = 0;
-      return parse_trust (sig, code, args);
+      return sig ? parse_trust (sig, code, args)
+	: trace_gpg_error (GPG_ERR_INV_ENGINE);
 
     case GPGME_STATUS_PKA_TRUST_BAD:
     case GPGME_STATUS_PKA_TRUST_GOOD:
@@ -1183,11 +1105,6 @@ _gpgme_verify_status_handler (void *priv, gpgme_status_code_t code, char *args)
     case GPGME_STATUS_VERIFICATION_COMPLIANCE_MODE:
       PARSE_COMPLIANCE_FLAGS (args, opd->current_sig);
       break;
-
-    case GPGME_STATUS_NO_PUBKEY:
-      opd->only_newsig_seen = 0;
-      return sig ? parse_no_pubkey (sig, args, ctx->protocol)
-	: trace_gpg_error (GPG_ERR_INV_ENGINE);
 
     default:
       break;
@@ -1391,4 +1308,110 @@ gpgme_get_sig_status (gpgme_ctx_t ctx, int idx,
   if (r_created)
     *r_created = sig->timestamp;
   return sig->fpr;
+}
+
+
+/* Retrieve certain attributes of a signature.  IDX is the index
+   number of the signature after a successful verify operation.  WHAT
+   is an attribute where GPGME_ATTR_EXPIRE is probably the most useful
+   one.  WHATIDX is to be passed as 0 for most attributes . */
+unsigned long
+gpgme_get_sig_ulong_attr (gpgme_ctx_t ctx, int idx,
+                          _gpgme_attr_t what, int whatidx)
+{
+  gpgme_verify_result_t result;
+  gpgme_signature_t sig;
+
+  (void)whatidx;
+
+  result = gpgme_op_verify_result (ctx);
+  sig = result->signatures;
+
+  while (sig && idx)
+    {
+      sig = sig->next;
+      idx--;
+    }
+  if (!sig || idx)
+    return 0;
+
+  switch (what)
+    {
+    case GPGME_ATTR_CREATED:
+      return sig->timestamp;
+
+    case GPGME_ATTR_EXPIRE:
+      return sig->exp_timestamp;
+
+    case GPGME_ATTR_VALIDITY:
+      return (unsigned long) sig->validity;
+
+    case GPGME_ATTR_SIG_STATUS:
+      switch (gpg_err_code (sig->status))
+	{
+	case GPG_ERR_NO_ERROR:
+	  return GPGME_SIG_STAT_GOOD;
+
+	case GPG_ERR_BAD_SIGNATURE:
+	  return GPGME_SIG_STAT_BAD;
+
+	case GPG_ERR_NO_PUBKEY:
+	  return GPGME_SIG_STAT_NOKEY;
+
+	case GPG_ERR_NO_DATA:
+	  return GPGME_SIG_STAT_NOSIG;
+
+	case GPG_ERR_SIG_EXPIRED:
+	  return GPGME_SIG_STAT_GOOD_EXP;
+
+	case GPG_ERR_KEY_EXPIRED:
+	  return GPGME_SIG_STAT_GOOD_EXPKEY;
+
+	default:
+	  return GPGME_SIG_STAT_ERROR;
+	}
+
+    case GPGME_ATTR_SIG_SUMMARY:
+      return sig->summary;
+
+    default:
+      break;
+    }
+  return 0;
+}
+
+
+const char *
+gpgme_get_sig_string_attr (gpgme_ctx_t ctx, int idx,
+                           _gpgme_attr_t what, int whatidx)
+{
+  gpgme_verify_result_t result;
+  gpgme_signature_t sig;
+
+  result = gpgme_op_verify_result (ctx);
+  sig = result->signatures;
+
+  while (sig && idx)
+    {
+      sig = sig->next;
+      idx--;
+    }
+  if (!sig || idx)
+    return NULL;
+
+  switch (what)
+    {
+    case GPGME_ATTR_FPR:
+      return sig->fpr;
+
+    case GPGME_ATTR_ERRTOK:
+      if (whatidx == 1)
+        return sig->wrong_key_usage ? "Wrong_Key_Usage" : "";
+      else
+	return "";
+    default:
+      break;
+    }
+
+  return NULL;
 }

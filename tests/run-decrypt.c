@@ -62,7 +62,6 @@ print_result (gpgme_decrypt_result_t result)
   printf ("MIME flag ..........: %s\n", result->is_mime? "yes":"no");
   printf ("Unsupported algo ...: %s\n", nonnull(result->unsupported_algorithm));
   printf ("Session key ........: %s\n", nonnull (result->session_key));
-  printf ("Session hash .......: %s\n", nonnull (result->session_hash));
   printf ("Symmetric algorithm : %s\n", result->symkey_algo);
 
   for (recp = result->recipients; recp && recp->next; recp = recp->next)
@@ -85,14 +84,12 @@ show_usage (int ex)
          "  --status         print status lines from the backend\n"
          "  --openpgp        use the OpenPGP protocol (default)\n"
          "  --cms            use the CMS protocol\n"
-         "  --show-session-hash             show the session key hash\n"
          "  --export-session-key            show the session key\n"
          "  --override-session-key STRING   use STRING as session key\n"
          "  --request-origin STRING         use STRING as request origin\n"
          "  --no-symkey-cache               disable the use of that cache\n"
          "  --ignore-mdc-error              allow decryption of legacy data\n"
          "  --unwrap         remove only the encryption layer\n"
-         "  --list-only      no actual decryption\n"
          "  --large-buffers  use large I/O buffer\n"
          "  --sensitive      mark data objects as sensitive\n"
          "  --output FILE    write output to FILE instead of stdout\n"
@@ -166,11 +163,6 @@ main (int argc, char **argv)
           protocol = GPGME_PROTOCOL_CMS;
           argc--; argv++;
         }
-      else if (!strcmp (*argv, "--show-session-hash"))
-        {
-          flags |= GPGME_DECRYPT_SESSION_HASH;
-          argc--; argv++;
-        }
       else if (!strcmp (*argv, "--export-session-key"))
         {
           export_session_key = 1;
@@ -221,11 +213,6 @@ main (int argc, char **argv)
         {
           flags |= GPGME_DECRYPT_UNWRAP;
           raw_output = 1;
-          argc--; argv++;
-        }
-      else if (!strcmp (*argv, "--list-only"))
-        {
-          flags |= GPGME_DECRYPT_LISTONLY;
           argc--; argv++;
         }
       else if (!strcmp (*argv, "--output"))
@@ -458,7 +445,7 @@ main (int argc, char **argv)
     {
       if (!raw_output)
         print_result (result);
-      if (!output && !(flags & GPGME_DECRYPT_LISTONLY))
+      if (!output)
         {
           if (!raw_output)
             fputs ("Begin Output:\n", stdout);

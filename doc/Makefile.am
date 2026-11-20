@@ -89,6 +89,7 @@ defs.inc: defsincdate Makefile mkdefsinc
 online: gpgme.html gpgme.pdf
 	set -e; \
 	echo "Uploading current manuals to www.gnupg.org ..."; \
+        user=werner ; \
 	(cd gpgme.html && rsync -vr --exclude='.svn' .  \
-	    gnupg.org:webspace/documentation/manuals/gpgme/ ); \
-        rsync -v gpgme.pdf gnupg.org:webspace/documentation/manuals/
+	  $${user}@ftp.gnupg.org:webspace/manuals/gpgme/ ); \
+        rsync -v gpgme.pdf $${user}@ftp.gnupg.org:webspace/manuals/

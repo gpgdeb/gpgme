@@ -230,8 +230,7 @@ gpgconf_read (void *engine, const char *arg1, char *arg2,
   char *argv[6];
   int argc = 0;
   int rp[2];
-  struct spawn_fd_item_s cfd[] = { {-1, 1 /* STDOUT_FILENO */,
-                                      ASSUAN_INVALID_FD, 0},
+  struct spawn_fd_item_s cfd[] = { {-1, 1 /* STDOUT_FILENO */, -1, 0},
 				   {-1, -1} };
   int status;
   int nread;
@@ -265,7 +264,7 @@ gpgconf_read (void *engine, const char *arg1, char *arg2,
       return gpg_error_from_syserror ();
     }
 
-  linebufsize = 2048; /* Usually enough for conf lines.  */
+  linebufsize = 1024; /* Usually enough for conf lines.  */
   linebuf = malloc (linebufsize);
   if (!linebuf)
     {
@@ -718,8 +717,7 @@ gpgconf_write (void *engine, const char *arg1, char *arg2, gpgme_data_t conf)
   int rp[2] = { -1, -1 };
   int errp[2] = { -1, -1 };
   struct spawn_fd_item_s cfd[] = { {-1, 0 /* STDIN_FILENO */},
-                                   {-1, 2 /* STDERR_FILENO */,
-                                    ASSUAN_INVALID_FD},
+                                   {-1, 2 /* STDERR_FILENO */, -1},
                                    {-1, -1} };
   int status;
   int nwrite;
@@ -1137,8 +1135,7 @@ gpgconf_query_swdb (void *engine,
   char *argv[7];
   int argc = 0;
   int rp[2];
-  struct spawn_fd_item_s cfd[] = { {-1, 1 /* STDOUT_FILENO */,
-                                      ASSUAN_INVALID_FD, 0},
+  struct spawn_fd_item_s cfd[] = { {-1, 1 /* STDOUT_FILENO */, -1, 0},
 				   {-1, -1} };
   int status;
   int nread;
@@ -1315,7 +1312,6 @@ struct engine_ops _gpgme_engine_ops_gpgconf =
     NULL,               /* setexpire */
     NULL,               /* setownertrust */
     NULL,               /* opassuan_transact */
-    NULL,               /* getdirect */
     gpgconf_conf_load,
     gpgconf_conf_save,
     gpgconf_conf_dir,

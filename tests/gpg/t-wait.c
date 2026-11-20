@@ -30,7 +30,7 @@
 #include <string.h>
 
 #ifdef HAVE_W32_SYSTEM
-#define sleep(seconds) Sleep(seconds*1000)
+#define sleep _sleep
 #endif
 
 #include <gpgme.h>

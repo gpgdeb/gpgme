@@ -263,7 +263,6 @@ gpgme_release (gpgme_ctx_t ctx)
   free (ctx->import_filter);
   free (ctx->import_options);
   free (ctx->known_notations);
-  free (ctx->export_filter);
   _gpgme_engine_info_release (ctx->engine_info);
   ctx->engine_info = NULL;
   DESTROY_LOCK (ctx->lock);
@@ -632,13 +631,6 @@ gpgme_set_ctx_flag (gpgme_ctx_t ctx, const char *name, const char *value)
       if (!ctx->known_notations)
         err = gpg_error_from_syserror ();
     }
-  else if (!strcmp (name, "export-filter"))
-    {
-      free (ctx->export_filter);
-      ctx->export_filter = strdup (value);
-      if (!ctx->export_filter)
-        err = gpg_error_from_syserror ();
-    }
   else
     err = gpg_error (GPG_ERR_UNKNOWN_NAME);
 
@@ -735,10 +727,6 @@ gpgme_get_ctx_flag (gpgme_ctx_t ctx, const char *name)
   else if (!strcmp (name, "known-notations"))
     {
       return ctx->known_notations? ctx->known_notations: "";
-    }
-  else if (!strcmp (name, "export-filter"))
-    {
-      return ctx->export_filter? ctx->export_filter : "";
     }
   else
     return NULL;
@@ -1321,7 +1309,6 @@ gpgme_pubkey_algo_string (gpgme_subkey_t subkey)
     case GPGME_PK_RSA_E:
     case GPGME_PK_RSA_S: prefix = "rsa"; break;
     case GPGME_PK_KYBER: composite = 1; break;
-    case GPGME_PK_DLTHM: composite = 1; break;
     case GPGME_PK_ELG_E: prefix = "elg"; break;
     case GPGME_PK_DSA:	 prefix = "dsa"; break;
     case GPGME_PK_ELG:   prefix = "xxx"; break;
@@ -1329,8 +1316,6 @@ gpgme_pubkey_algo_string (gpgme_subkey_t subkey)
     case GPGME_PK_ECDH:
     case GPGME_PK_ECDSA:
     case GPGME_PK_EDDSA: prefix = "";    break;
-    case GPGME_PK_MLDSA: composite = 1; break;
-    case GPGME_PK_MLKEM: composite = 1; break;
     }
 
   if (composite && subkey->curve)
@@ -1362,7 +1347,6 @@ gpgme_pubkey_algo_name (gpgme_pubkey_algo_t algo)
     case GPGME_PK_RSA_E: return "RSA-E";
     case GPGME_PK_RSA_S: return "RSA-S";
     case GPGME_PK_KYBER: return "KYBER";
-    case GPGME_PK_DLTHM: return "DILITHIUM";
     case GPGME_PK_ELG_E: return "ELG-E";
     case GPGME_PK_DSA:   return "DSA";
     case GPGME_PK_ECC:   return "ECC";
@@ -1370,8 +1354,6 @@ gpgme_pubkey_algo_name (gpgme_pubkey_algo_t algo)
     case GPGME_PK_ECDSA: return "ECDSA";
     case GPGME_PK_ECDH:  return "ECDH";
     case GPGME_PK_EDDSA: return "EdDSA";
-    case GPGME_PK_MLDSA: return "MLDSA";
-    case GPGME_PK_MLKEM: return "MLKEM";
     default:             return NULL;
     }
 }

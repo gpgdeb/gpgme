@@ -48,7 +48,7 @@ else
 tests =
 endif
 
-SUBDIRS = src ${tests} doc lang tools
+SUBDIRS = src ${tests} doc lang
 
 # Fix the version of the spec file.
 dist-hook: gen-ChangeLog

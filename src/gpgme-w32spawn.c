@@ -38,7 +38,6 @@
 #include <stdint.h>
 #include <process.h>
 
-#include "util.h"
 #include "priv-io.h"
 
 /* #define DEBUG_TO_FILE 1 */
@@ -159,21 +158,21 @@ my_spawn (wchar_t **argv, struct spawn_fd_item_s *fd_list, unsigned int flags)
       /* The handle already is inheritable.  */
       if (fd_list[i].dup_to == 0)
 	{
-	  si.hStdInput = fd_list[i].peer_name;
+	  si.hStdInput = (HANDLE) fd_list[i].peer_name;
 	  duped_stdin = 1;
-	  fprintf (mystderr, PGM": dup %p to stdin\n", fd_list[i].peer_name);
+	  fprintf (mystderr, PGM": dup 0x%x to stdin\n", fd_list[i].peer_name);
         }
       else if (fd_list[i].dup_to == 1)
 	{
-	  si.hStdOutput = fd_list[i].peer_name;
+	  si.hStdOutput = (HANDLE) fd_list[i].peer_name;
 	  duped_stdout = 1;
-	  fprintf (mystderr, PGM": dup %p to stdout\n", fd_list[i].peer_name);
+	  fprintf (mystderr, PGM": dup 0x%x to stdout\n", fd_list[i].peer_name);
         }
       else if (fd_list[i].dup_to == 2)
 	{
-	  si.hStdError = fd_list[i].peer_name;
+	  si.hStdError = (HANDLE) fd_list[i].peer_name;
 	  duped_stderr = 1;
-	  fprintf (mystderr, PGM":dup %p to stderr\n", fd_list[i].peer_name);
+	  fprintf (mystderr, PGM":dup 0x%x to stderr\n", fd_list[i].peer_name);
         }
     }
 
@@ -234,6 +233,9 @@ my_spawn (wchar_t **argv, struct spawn_fd_item_s *fd_list, unsigned int flags)
   if (hnul != INVALID_HANDLE_VALUE)
     CloseHandle (hnul);
 
+  for (i = 0; fd_list[i].fd != -1; i++)
+    CloseHandle ((HANDLE) fd_list[i].fd);
+
   if (flags & IOSPAWN_FLAG_ALLOW_SET_FG)
     {
       static int initialized;
@@ -247,7 +249,7 @@ my_spawn (wchar_t **argv, struct spawn_fd_item_s *fd_list, unsigned int flags)
           handle = LoadLibraryA ("user32.dll");
           if (handle)
             {
-              func = (void *)GetProcAddress (handle, "AllowSetForegroundWindow");
+              func = GetProcAddress (handle, "AllowSetForegroundWindow");
               if (!func)
                 FreeLibrary (handle);
             }
@@ -314,7 +316,7 @@ translate_get_from_file (const wchar_t *trans_file,
     {
       unsigned long from;
       long dup_to;
-      HANDLE to;
+      unsigned long to;
       unsigned long loc;
       char *tail;
 
@@ -356,11 +358,7 @@ translate_get_from_file (const wchar_t *trans_file,
 	linep++;
       if (*linep == '\0')
 	break;
-#if HAVE_W64_SYSTEM
-      to = (HANDLE)strtoull (linep, &tail, 0);
-#else
-      to = (HANDLE)strtoul (linep, &tail, 0);
-#endif
+      to = strtoul (linep, &tail, 0);
       if (tail == NULL || ! (*tail == '\0' || isspace (*tail)))
 	break;
       linep = tail;
@@ -381,7 +379,7 @@ translate_get_from_file (const wchar_t *trans_file,
     }
   fd_list[idx].fd = -1;
   fd_list[idx].dup_to = -1;
-  fd_list[idx].peer_name = ASSUAN_INVALID_FD;
+  fd_list[idx].peer_name = -1;
   fd_list[idx].arg_loc = 0;
   return 0;
 }
@@ -471,12 +469,7 @@ wmain (int argc, const wchar_t * const *argv)
     }
 
 #ifdef DEBUG_TO_FILE
-  {
-    FILE *tmpfp = fopen ("h:/gpgme-w32spawn.log", "a");
-    if (tmpfp)
-      mystderr = tmpfp;
-    fputs (PGM": started\n", mystderr);
-  }
+  mystderr = fopen ("h:/gpgme-w32spawn.log", "w");
 #endif
 
   argv_spawn = translate_handles (argv[1], &argv[2], fd_list, &flags);

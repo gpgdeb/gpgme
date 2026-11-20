@@ -44,10 +44,7 @@ typedef struct
 
   int okay;
 
-  /* Indicates that list only mode is active.  */
-  int list_only;
-
-  /* A flag telling that the decryption failed and two optional error
+  /* A flag telling that the a decryption failed and two optional error
    * codes to further specify the failure for public key decryption and
    * symmetric decryption.  */
   int failed;
@@ -89,7 +86,6 @@ release_op_data (void *hook)
   free (opd->result.unsupported_algorithm);
   free (opd->result.file_name);
   free (opd->result.session_key);
-  free (opd->result.session_hash);
   free (opd->result.symkey_algo);
 
   while (recipient)
@@ -423,7 +419,7 @@ _gpgme_decrypt_status_handler (void *priv, gpgme_status_code_t code,
           /* Generic decryption failed error code.  */
           return gpg_error (GPG_ERR_DECRYPT_FAILED);
         }
-      else if (!opd->okay && !opd->list_only)
+      else if (!opd->okay)
         {
           /* No data was found.  */
           return gpg_error (GPG_ERR_NO_DATA);
@@ -479,12 +475,6 @@ _gpgme_decrypt_status_handler (void *priv, gpgme_status_code_t code,
       if (opd->result.session_key)
         free (opd->result.session_key);
       opd->result.session_key = strdup(args);
-      break;
-
-    case GPGME_STATUS_SESSION_HASH:
-      if (opd->result.session_hash)
-        free (opd->result.session_hash);
-      opd->result.session_hash = strdup (args);
       break;
 
     case GPGME_STATUS_NO_SECKEY:
@@ -550,8 +540,7 @@ decrypt_status_handler (void *priv, gpgme_status_code_t code, char *args)
 
 
 gpgme_error_t
-_gpgme_op_decrypt_init_result (gpgme_ctx_t ctx, gpgme_data_t plaintext,
-                               gpgme_decrypt_flags_t flags)
+_gpgme_op_decrypt_init_result (gpgme_ctx_t ctx, gpgme_data_t plaintext)
 {
   gpgme_error_t err;
   void *hook;
@@ -563,7 +552,6 @@ _gpgme_op_decrypt_init_result (gpgme_ctx_t ctx, gpgme_data_t plaintext,
   if (err)
     return err;
 
-  opd->list_only = !!(flags & GPGME_DECRYPT_LISTONLY);
   opd->last_recipient_p = &opd->result.recipients;
   opd->plaintext_dserial = _gpgme_data_get_dserial (plaintext);
   return 0;
@@ -583,7 +571,7 @@ _gpgme_decrypt_start (gpgme_ctx_t ctx, int synchronous,
   if (err)
     return err;
 
-  err = _gpgme_op_decrypt_init_result (ctx, plain, flags);
+  err = _gpgme_op_decrypt_init_result (ctx, plain);
   if (err)
     return err;
 

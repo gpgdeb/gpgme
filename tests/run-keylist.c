@@ -349,8 +349,7 @@ main (int argc, char **argv)
         {
           char *algostr;
 
-          printf ("fpr   %2d: %s%s\n", nsub, nonnull (subkey->fpr),
-                  subkey->subkey_match? " (match)":"");
+          printf ("fpr   %2d: %s\n", nsub, nonnull (subkey->fpr));
           if (subkey->v5fpr)
             printf ("v5fpr %2d: %s\n", nsub, nonnull (subkey->v5fpr));
           if (subkey->keygrip)

@@ -111,14 +111,11 @@ gpgme_error_t _gpgme_engine_op_encrypt_sign (engine_t engine,
 					     gpgme_ctx_t ctx /* FIXME */);
 gpgme_error_t _gpgme_engine_op_export (engine_t engine, const char *pattern,
 				       gpgme_export_mode_t mode,
-				       gpgme_data_t keydata,
-				       const char *export_filter,
-				       int use_armor);
+				       gpgme_data_t keydata, int use_armor);
 gpgme_error_t _gpgme_engine_op_export_ext (engine_t engine,
 					   const char *pattern[],
 					   gpgme_export_mode_t mode,
 					   gpgme_data_t keydata,
-					   const char *export_filter,
 					   int use_armor);
 gpgme_error_t _gpgme_engine_op_genkey (engine_t engine,
                                        const char *userid, const char *algo,
@@ -187,10 +184,6 @@ gpgme_error_t _gpgme_engine_op_assuan_transact
                  void *inq_cb_value,
                  gpgme_assuan_status_cb_t status_cb,
                  void *status_cb_value);
-
-gpgme_error_t _gpgme_engine_op_getdirect (engine_t engine, const char *argv[],
-                                          gpgme_data_t dataout,
-                                          unsigned int flags);
 
 gpgme_error_t _gpgme_engine_op_conf_load (engine_t engine,
 					  gpgme_conf_comp_t *conf_p);

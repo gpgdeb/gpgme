@@ -30,7 +30,6 @@
 #include "debug.h"
 #include "context.h"
 #include "ops.h"
-#include "util.h"
 
 
 typedef struct
@@ -172,10 +171,6 @@ _gpgme_encrypt_status_handler (void *priv, gpgme_status_code_t code,
 
     case GPGME_STATUS_SUCCESS:
       opd->success_seen = 1;
-      break;
-
-    case GPGME_STATUS_ENCRYPTION_COMPLIANCE_MODE:
-      PARSE_COMPLIANCE_FLAGS (args, &opd->result);
       break;
 
     default:

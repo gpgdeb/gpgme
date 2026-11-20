@@ -225,6 +225,10 @@ _gpgme_wait_global_event_cb (void *data, gpgme_event_io_t type,
       assert (!"Unexpected event GPGME_EVENT_NEXT_KEY");
       break;
 
+    case GPGME_EVENT_NEXT_TRUSTITEM:
+      assert (!"Unexpected event GPGME_EVENT_NEXT_TRUSTITEM");
+      break;
+
     default:
       assert (!"Unexpected event");
       break;

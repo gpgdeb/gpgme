@@ -47,6 +47,8 @@
  * lower value and dynamically resize the table.  */
 #define MAX_SLAFD 512
 
+#define handle_to_fd(a)  ((int)(a))
+
 #define READBUF_SIZE 4096
 #define WRITEBUF_SIZE 4096
 #define PIPEBUF_SIZE  4096
@@ -231,15 +233,15 @@ release_hddesc (hddesc_t hdd)
       /* Holds a valid handle or was never initialized (in which case
        * REFCOUNT would be -1 here).  */
       TRACE_BEG  (DEBUG_SYSIO, "gpgme:release_hddesc", hdd,
-                  "hd=%p, sock=%p, refcount=%d",
-                  hdd->hd, (void *)hdd->sock, hdd->refcount);
+                  "hd=%p, sock=%d, refcount=%d",
+                  hdd->hd, hdd->sock, hdd->refcount);
 
       if (hdd->hd != INVALID_HANDLE_VALUE)
         close_handle (hdd->hd);
 
       if (hdd->sock != INVALID_SOCKET)
         {
-          TRACE_LOG  ("closing socket %p", (void *)hdd->sock);
+          TRACE_LOG  ("closing socket %d", hdd->sock);
           if (closesocket (hdd->sock))
             {
               TRACE_LOG  ("closesocket failed: ec=%d", (int)WSAGetLastError ());
@@ -352,11 +354,9 @@ reader (void *arg)
   DWORD nread;
   int sock;
 
-  TRACE_BEG (DEBUG_SYSIO, "gpgme:reader", ctx->hdd, "hd=%p", ctx->hdd->hd);
-  LOCK (ctx->mutex);
-  TRACE_LOG ("sock=%p, thread=%p, refcount=%d",
-              (void *)ctx->hdd->sock, ctx->thread_hd,
-              ctx->refcount);
+  TRACE_BEG  (DEBUG_SYSIO, "gpgme:reader", ctx->hdd,
+	      "hd=%p, sock=%d, thread=%p, refcount=%d",
+              ctx->hdd->hd, ctx->hdd->sock, ctx->thread_hd, ctx->refcount);
 
   if (ctx->hdd->hd != INVALID_HANDLE_VALUE)
     sock = 0;
@@ -365,8 +365,7 @@ reader (void *arg)
 
   for (;;)
     {
-      char buffer[READBUF_SIZE];
-
+      LOCK (ctx->mutex);
       /* Leave a 1 byte gap so that we can see whether it is empty or
 	 full.  */
       if ((ctx->writepos + 1) % READBUF_SIZE == ctx->readpos)
@@ -376,20 +375,22 @@ reader (void *arg)
             {
               TRACE_LOG  ("ResetEvent failed: ec=%d", (int) GetLastError ());
             }
-	  TRACE_LOG  ("waiting for space (refcnt=%d)", ctx->refcount);
 	  UNLOCK (ctx->mutex);
+	  TRACE_LOG  ("waiting for space (refcnt=%d)", ctx->refcount);
 	  wait_for_single_object (ctx->have_space_ev, INFINITE);
 	  TRACE_LOG ("got space");
 	  LOCK (ctx->mutex);
        	}
       if (ctx->stop_me)
 	{
+	  UNLOCK (ctx->mutex);
 	  break;
         }
       nbytes = (ctx->readpos + READBUF_SIZE
 		- ctx->writepos - 1) % READBUF_SIZE;
       if (nbytes > READBUF_SIZE - ctx->writepos)
 	nbytes = READBUF_SIZE - ctx->writepos;
+      UNLOCK (ctx->mutex);
 
       TRACE_LOG  ("%s %d bytes", sock? "receiving":"reading", nbytes);
 
@@ -397,9 +398,7 @@ reader (void *arg)
         {
           int n;
 
-	  UNLOCK (ctx->mutex);
-          n = recv (ctx->hdd->sock, buffer, nbytes, 0);
-	  LOCK (ctx->mutex);
+          n = recv (ctx->hdd->sock, ctx->buffer + ctx->writepos, nbytes, 0);
           if (n < 0)
             {
               ctx->error_code = (int) WSAGetLastError ();
@@ -415,11 +414,14 @@ reader (void *arg)
                   if ( ctx->error_code == WSAECONNABORTED
                        || ctx->error_code == WSAECONNRESET)
                     {
+                      LOCK (ctx->mutex);
                       if (ctx->stop_me)
                         {
+                          UNLOCK (ctx->mutex);
                           TRACE_LOG ("got shutdown");
                           break;
                         }
+                      UNLOCK (ctx->mutex);
                     }
 
                   ctx->error = 1;
@@ -427,17 +429,12 @@ reader (void *arg)
                 }
               break;
             }
-          memcpy (ctx->buffer + ctx->writepos, buffer, n);
           nread = n;
         }
       else
         {
-          BOOL res;
-
-          UNLOCK (ctx->mutex);
-          res = ReadFile (ctx->hdd->hd, buffer, nbytes, &nread, NULL);
-          LOCK (ctx->mutex);
-          if (!res)
+          if (!ReadFile (ctx->hdd->hd,
+                         ctx->buffer + ctx->writepos, nbytes, &nread, NULL))
             {
               ctx->error_code = (int) GetLastError ();
               if (ctx->error_code == ERROR_BROKEN_PIPE)
@@ -457,16 +454,18 @@ reader (void *arg)
                 }
               break;
             }
-          memcpy (ctx->buffer + ctx->writepos, buffer, nread);
         }
+      LOCK (ctx->mutex);
       if (ctx->stop_me)
 	{
+	  UNLOCK (ctx->mutex);
 	  break;
         }
       if (!nread)
 	{
 	  ctx->eof = 1;
 	  TRACE_LOG ("got eof");
+	  UNLOCK (ctx->mutex);
 	  break;
         }
 
@@ -478,6 +477,7 @@ reader (void *arg)
           TRACE_LOG  ("SetEvent (%p) failed: ec=%d", ctx->have_data_ev,
                       (int) GetLastError ());
         }
+      UNLOCK (ctx->mutex);
     }
   /* Indicate that we have an error or EOF.  */
   if (!SetEvent (ctx->have_data_ev))
@@ -485,8 +485,6 @@ reader (void *arg)
       TRACE_LOG ("SetEvent (%p) failed: ec=%d", ctx->have_data_ev,
                 (int) GetLastError ());
     }
-
-  UNLOCK (ctx->mutex);
 
   TRACE_LOG ("waiting for close");
   wait_for_single_object (ctx->close_ev, INFINITE);
@@ -516,8 +514,8 @@ create_reader (hddesc_t hdd)
   DWORD tid;
 
   TRACE_BEG  (DEBUG_SYSIO, "gpgme:create_reader", hdd,
-              "hd=%p sock=%p refcount=%d",
-              hdd->hd, (void *)hdd->sock, hdd->refcount);
+              "handle=%p sock=%d refhdd=%d",
+              hdd->hd, hdd->sock, hdd->refcount);
 
   memset (&sec_attr, 0, sizeof sec_attr);
   sec_attr.nLength = sizeof sec_attr;
@@ -624,8 +622,8 @@ destroy_reader (struct reader_context_s *ctx)
     {
       if (shutdown (ctx->hdd->sock, 2))
         TRACE (DEBUG_SYSIO, "gpgme:destroy_reader", ctx,
-                "shutdown socket %p failed: ec=%d",
-                (void *)ctx->hdd->sock, (int) WSAGetLastError ());
+                "shutdown socket %d failed: ec=%d",
+                ctx->hdd->sock, (int) WSAGetLastError ());
     }
 
   /* After setting this event CTX is void. */
@@ -759,10 +757,9 @@ writer (void *arg)
   struct writer_context_s *ctx = arg;
   DWORD nwritten;
   int sock;
-  TRACE_BEG (DEBUG_SYSIO, "gpgme:writer", ctx->hdd, "hd=%p", ctx->hdd->hd);
-  LOCK (ctx->mutex);
-  TRACE_LOG ("sock=%p, thread=%p, refcount=%d",
-             (void *)ctx->hdd->sock, ctx->thread_hd, ctx->refcount);
+  TRACE_BEG  (DEBUG_SYSIO, "gpgme:writer", ctx->hdd,
+	      "hd=%p, sock=%d, thread=%p, refcount=%d",
+              ctx->hdd->hd, ctx->hdd->sock, ctx->thread_hd, ctx->refcount);
 
   if (ctx->hdd->hd != INVALID_HANDLE_VALUE)
     sock = 0;
@@ -771,10 +768,10 @@ writer (void *arg)
 
   for (;;)
     {
-      char buffer[READBUF_SIZE];
-
+      LOCK (ctx->mutex);
       if (ctx->stop_me && !ctx->nbytes)
 	{
+	  UNLOCK (ctx->mutex);
 	  break;
         }
       if (!ctx->nbytes)
@@ -791,8 +788,10 @@ writer (void *arg)
        	}
       if (ctx->stop_me && !ctx->nbytes)
 	{
+	  UNLOCK (ctx->mutex);
 	  break;
         }
+      UNLOCK (ctx->mutex);
 
       TRACE_LOG  ("%s %zd bytes", sock?"sending":"writing", ctx->nbytes);
 
@@ -805,11 +804,7 @@ writer (void *arg)
              be used with WriteFile.  */
           int n;
 
-          n = ctx->nbytes;
-          memcpy (buffer, ctx->buffer, n);
-	  UNLOCK (ctx->mutex);
-          n = send (ctx->hdd->sock, buffer, n, 0);
-	  LOCK (ctx->mutex);
+          n = send (ctx->hdd->sock, ctx->buffer, ctx->nbytes, 0);
           if (n < 0)
             {
               ctx->error_code = (int) WSAGetLastError ();
@@ -821,14 +816,8 @@ writer (void *arg)
         }
       else
         {
-          BOOL res;
-          int n = ctx->nbytes;
-
-          memcpy (buffer, ctx->buffer, n);
-	  UNLOCK (ctx->mutex);
-          res = WriteFile (ctx->hdd->hd, buffer, n, &nwritten, NULL);
-	  LOCK (ctx->mutex);
-          if (!res)
+          if (!WriteFile (ctx->hdd->hd, ctx->buffer,
+                          ctx->nbytes, &nwritten, NULL))
             {
 	      if (GetLastError () == ERROR_BUSY)
 		{
@@ -845,13 +834,14 @@ writer (void *arg)
         }
       TRACE_LOG  ("wrote %d bytes", (int) nwritten);
 
+      LOCK (ctx->mutex);
       ctx->nbytes -= nwritten;
+      UNLOCK (ctx->mutex);
     }
   /* Indicate that we have an error.  */
   if (!SetEvent (ctx->is_empty))
     TRACE_LOG  ("SetEvent failed: ec=%d", (int) GetLastError ());
 
-  UNLOCK (ctx->mutex);
   TRACE_LOG ("waiting for close");
   wait_for_single_object (ctx->close_ev, INFINITE);
 
@@ -880,8 +870,8 @@ create_writer (hddesc_t hdd)
 
 
 TRACE_BEG  (DEBUG_SYSIO, "gpgme:create_writer", hdd,
-             "hd=%p sock=%p refcount=%d",
-             hdd->hd, (void *)hdd->sock, hdd->refcount);
+             "handle=%p sock=%d refhdd=%d",
+             hdd->hd, hdd->sock, hdd->refcount);
 
   memset (&sec_attr, 0, sizeof sec_attr);
   sec_attr.nLength = sizeof sec_attr;
@@ -1003,8 +993,8 @@ find_writer (int fd)
     }
 
   /* Create a new writer thread.  */
-  TRACE_LOG  ("fd=%d -> hd=%p sock=%p dupfrom=%d creating writer",
-              fd, fd_table[fd].hdd->hd, (void *)fd_table[fd].hdd->sock,
+  TRACE_LOG  ("fd=%d -> handle=%p socket=%d dupfrom=%d creating writer",
+              fd, fd_table[fd].hdd->hd, fd_table[fd].hdd->sock,
               fd_table[fd].dup_from);
   wt = create_writer (fd_table[fd].hdd);
   if (!wt)
@@ -1141,7 +1131,7 @@ _gpgme_io_pipe (int filedes[2], int inherit_idx)
   /* Create a pipe.  */
   memset (&sec_attr, 0, sizeof (sec_attr));
   sec_attr.nLength = sizeof (sec_attr);
-  sec_attr.bInheritHandle = TRUE;
+  sec_attr.bInheritHandle = FALSE;
 
   if (!CreatePipe (&rh, &wh, &sec_attr, PIPEBUF_SIZE))
     {
@@ -1157,19 +1147,45 @@ _gpgme_io_pipe (int filedes[2], int inherit_idx)
   /* Make one end inheritable.  */
   if (inherit_idx == 0)
     {
-      if (!SetHandleInformation (wh, HANDLE_FLAG_INHERIT, 0))
-        {
-          gpg_err_set_errno (EIO);
-          return TRACE_SYSRES (-1);
+      HANDLE hd;
+      if (!DuplicateHandle (GetCurrentProcess(), rh,
+			    GetCurrentProcess(), &hd, 0,
+			    TRUE, DUPLICATE_SAME_ACCESS))
+	{
+	  TRACE_LOG  ("DuplicateHandle failed: ec=%d",
+		      (int) GetLastError ());
+	  release_fd (rfd);
+	  release_fd (wfd);
+	  close_handle (rh);
+	  close_handle (wh);
+          release_hddesc (rhdesc);
+          release_hddesc (whdesc);
+	  gpg_err_set_errno (EIO);
+	  return TRACE_SYSRES (-1);
         }
+      close_handle (rh);
+      rh = hd;
     }
   else if (inherit_idx == 1)
     {
-      if (!SetHandleInformation (rh, HANDLE_FLAG_INHERIT, 0))
-        {
-          gpg_err_set_errno (EIO);
-          return TRACE_SYSRES (-1);
+      HANDLE hd;
+      if (!DuplicateHandle( GetCurrentProcess(), wh,
+			    GetCurrentProcess(), &hd, 0,
+			    TRUE, DUPLICATE_SAME_ACCESS))
+	{
+	  TRACE_LOG  ("DuplicateHandle failed: ec=%d",
+		      (int) GetLastError ());
+	  release_fd (rfd);
+	  release_fd (wfd);
+	  close_handle (rh);
+	  close_handle (wh);
+          release_hddesc (rhdesc);
+          release_hddesc (whdesc);
+	  gpg_err_set_errno (EIO);
+	  return TRACE_SYSRES (-1);
         }
+      close_handle (wh);
+      wh = hd;
     }
 
   /* Put the HANDLEs of the new pipe into the file descriptor table.
@@ -1347,246 +1363,12 @@ build_commandline (char **argv)
   return buf;
 }
 
-#if !defined(GPGRT_PROCESS_STDIO_NUL) /* libgpg-error is old.  */
-int
-_gpgme_io_spawn_sans_helper (const char *path, char *const spawn_argv[],
-                             unsigned int spawn_flags,
-                             struct spawn_fd_item_s *fd_list,
-                             void (*atfork) (void *opaque, int reserved),
-                             void *atforkvalue, assuan_pid_t *r_pid)
-{
-  static int spawn_warning_shown;
-
-  if (1)
-    {
-      /* This is a common mistake for new users of gpgme not to include
-         gpgme-w32spawn.exe with their binary. So we want to make
-         this transparent to developers. If users have somehow messed
-         up their installation this should also be properly communicated
-         as otherwise calls to gnupg will result in unsupported protocol
-         errors that do not explain a lot. */
-      if (!spawn_warning_shown)
-        {
-          char *msg;
-          gpgrt_asprintf (&msg, "gpgme-w32spawn.exe was not found in the "
-                                "detected installation directory of GpgME"
-                                "\n\t\"%s\"\n\n"
-                                "Crypto operations will not work.\n\n"
-                                "If you see this it indicates a problem "
-                                "with your installation.\n"
-                                "Please report the problem to your "
-                                "distributor of GpgME.\n\n"
-                                "Developer's Note: The install dir can be "
-                                "manually set with: gpgme_set_global_flag",
-                                _gpgme_get_inst_dir ());
-          MessageBoxA (NULL, msg, "GpgME not installed correctly", MB_OK);
-          gpgrt_free (msg);
-          spawn_warning_shown = 1;
-        }
-      gpg_err_set_errno (EIO);
-      return TRACE_SYSRES (-1);
-    }
-}
-#else
-/* Format string to represent the handle.  */
-#ifdef _WIN64
-#define FMT_HD "%llu"
-#else
-#define FMT_HD "%u"
-#endif
-
-/* Enough string space to put the handle with FMT_HD in 64-bit.  */
-#define MAX_ARG_STR 23
-
-int
-_gpgme_io_spawn_sans_helper (const char *path, char *const spawn_argv[],
-                             unsigned int spawn_flags,
-                             struct spawn_fd_item_s *fd_list,
-                             void (*atfork) (void *opaque, int reserved),
-                             void *atforkvalue, assuan_pid_t *r_pid)
-{
-  int i;
-  gpg_err_code_t ec;
-  unsigned int flags = GPGRT_PROCESS_STDIO_NUL;
-  gpgrt_spawn_actions_t act;
-  gpgrt_process_t process;
-  HANDLE handle_in, handle_out, handle_err;
-  const char **argv;
-  int argc;
-  char *p;
-  HANDLE hProcess;
-  HANDLE handles[32];
-  int inherit_hd = 0;
-
-  TRACE_BEG  (DEBUG_SYSIO, "_gpgme_io_spawn", path,
-	      "path=%s", path);
-
-  (void)atfork;
-  (void)atforkvalue;
-
-  i = 0;
-  while (spawn_argv[i])
-    {
-      TRACE_LOG  ("argv[%2i] = %s", i, spawn_argv[i]);
-      i++;
-    }
-  argc = i;
-
-  argv = malloc ((sizeof (char *) + MAX_ARG_STR)* (argc + 1));
-  if (!argv)
-    return TRACE_SYSRES (-1);
-  p = (char *)&argv[argc+1];
-
-  for (i = 0; i < argc; i++)
-    argv[i] = spawn_argv[i];
-  argv[argc] = NULL;
-
-  flags |= GPGRT_PROCESS_DETACHED;
-  if ((spawn_flags & IOSPAWN_FLAG_ALLOW_SET_FG))
-    flags |= GPGRT_PROCESS_ALLOW_SET_FG;
-
-  LOCK (fd_table_lock);
-  for (i = 0; fd_list[i].fd != -1; i++)
-    {
-      int fd = fd_list[i].fd;
-      HANDLE hd = INVALID_HANDLE_VALUE;
-
-      if (fd >= 0 && fd < fd_table_size && fd_table[fd].used
-          && fd_table[fd].hdd)
-	hd = fd_table[fd].hdd->hd;
-
-      fd_list[i].peer_name = hd;
-    }
-  UNLOCK (fd_table_lock);
-
-  handle_in = handle_out = handle_err = INVALID_HANDLE_VALUE;
-
-  for (i = 0; fd_list[i].fd != -1; i++)
-    {
-      HANDLE hd = fd_list[i].peer_name;
-      int idx;
-      int r;
-      int std_hd = 0;
-
-      if (fd_list[i].dup_to == 0)
-        {
-          handle_in = hd;
-          std_hd++;
-        }
-      else if (fd_list[i].dup_to == 1)
-        {
-          handle_out = hd;
-          std_hd++;
-        }
-      else if (fd_list[i].dup_to == 2)
-        {
-          handle_err = hd;
-          std_hd++;
-        }
-
-      if (!std_hd)
-        {
-          if (inherit_hd < DIM (handles) - 1)
-            {
-              if (hd != INVALID_HANDLE_VALUE)
-                handles[inherit_hd++] = hd;
-            }
-          else
-            {
-              free (argv);
-              return TRACE_SYSRES (-1);
-            }
-        }
-
-      idx = fd_list[i].arg_loc;
-      if (idx == 0)
-        continue;
-      if (idx >= argc)
-        /* something goes wrong, ignore.  */
-        continue;
-
-      /* Fix the arg at ARG_LOC.  */
-      if (spawn_argv[idx][0] == '-' && spawn_argv[idx][1] == '&')
-        r = snprintf (p, MAX_ARG_STR, "-&" FMT_HD, (uintptr_t)hd);
-      else
-        r = snprintf (p, MAX_ARG_STR, FMT_HD, (uintptr_t)hd);
-      argv[idx] = p;
-
-      if (r < 0)
-        {
-          free (argv);
-          return TRACE_SYSRES (-1);
-        }
-
-      p += r + 1;
-    }
-
-  handles[inherit_hd] = INVALID_HANDLE_VALUE;
-
-  ec = gpgrt_spawn_actions_new (&act);
-  if (ec)
-    {
-      free (argv);
-      return TRACE_SYSRES (-1);
-    }
-
-  gpgrt_spawn_actions_set_redirect (act, handle_in, handle_out, handle_err);
-  gpgrt_spawn_actions_set_inherit_handles (act, handles);
-
-  ec = gpgrt_process_spawn (path, argv+1, flags, act, &process);
-  gpgrt_spawn_actions_release (act);
-  free (argv);
-  if (ec)
-    {
-      gpg_err_set_errno (EIO);
-      return TRACE_SYSRES (-1);
-    }
-
-  gpgrt_process_ctl (process, GPGRT_PROCESS_GET_P_HANDLE, &hProcess);
-
-  TRACE_LOG  ("process=%p", hProcess);
-
-#if ASSUAN_VERSION_NUMBER < 0x030000
-  if (r_pid)
-    gpgrt_process_ctl (process, GPGRT_PROCESS_GET_PROC_ID, r_pid);
-
-  /* We don't need to wait for the process.  */
-  close_handle (hProcess);
-#else
-  if (r_pid)
-    *r_pid = (assuan_pid_t)hProcess;
-  else
-    /* We don't need to wait for the process.  */
-    close_handle (hProcess);
-#endif
-
-  if (!(spawn_flags & IOSPAWN_FLAG_NOCLOSE))
-    {
-      for (i = 0; fd_list[i].fd != -1; i++)
-	_gpgme_io_close (fd_list[i].fd);
-    }
-
-  for (i = 0; fd_list[i].fd != -1; i++)
-    if (fd_list[i].dup_to == -1)
-      TRACE_LOG  ("fd[%i] = 0x%x -> %p", i, fd_list[i].fd,
-		  fd_list[i].peer_name);
-    else
-      TRACE_LOG  ("fd[%i] = 0x%x -> %p (std%s)", i, fd_list[i].fd,
-		  fd_list[i].peer_name, (fd_list[i].dup_to == 0) ? "in" :
-		  ((fd_list[i].dup_to == 1) ? "out" : "err"));
-
-  gpgrt_process_release (process);
-
-  return TRACE_SYSRES (0);
-}
-#endif
-
 
 int
 _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
 		 struct spawn_fd_item_s *fd_list,
 		 void (*atfork) (void *opaque, int reserved),
-		 void *atforkvalue, assuan_pid_t *r_pid)
+		 void *atforkvalue, pid_t *r_pid)
 {
   PROCESS_INFORMATION pi =
     {
@@ -1607,14 +1389,13 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
   int tmp_fd;
   char *tmp_name;
   const char *spawnhelper;
+  static int spawn_warning_shown = 0;
 
   TRACE_BEG  (DEBUG_SYSIO, "_gpgme_io_spawn", path,
 	      "path=%s", path);
 
-  spawnhelper = _gpgme_get_w32spawn_path ();
-  if (!spawnhelper)
-    return _gpgme_io_spawn_sans_helper (path, argv, flags,
-                                        fd_list, atfork, atforkvalue, r_pid);
+  (void)atfork;
+  (void)atforkvalue;
 
   i = 0;
   while (argv[i])
@@ -1636,7 +1417,7 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
   TRACE_LOG  ("tmp_name = %s", tmp_name);
 
   args = calloc (2 + i + 1, sizeof (*args));
-  args[0] = (char *)spawnhelper;
+  args[0] = (char *) _gpgme_get_w32spawn_path ();
   args[1] = tmp_name;
   args[2] = (char *)path;
   memcpy (&args[3], &argv[1], i * sizeof (*args));
@@ -1667,6 +1448,39 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
   if ((flags & IOSPAWN_FLAG_DETACHED))
     cr_flags |= DETACHED_PROCESS;
   cr_flags |= GetPriorityClass (GetCurrentProcess ());
+  spawnhelper = _gpgme_get_w32spawn_path ();
+  if (!spawnhelper)
+    {
+      /* This is a common mistake for new users of gpgme not to include
+         gpgme-w32spawn.exe with their binary. So we want to make
+         this transparent to developers. If users have somehow messed
+         up their installation this should also be properly communicated
+         as otherwise calls to gnupg will result in unsupported protocol
+         errors that do not explain a lot. */
+      if (!spawn_warning_shown)
+        {
+          char *msg;
+          gpgrt_asprintf (&msg, "gpgme-w32spawn.exe was not found in the "
+                                "detected installation directory of GpgME"
+                                "\n\t\"%s\"\n\n"
+                                "Crypto operations will not work.\n\n"
+                                "If you see this it indicates a problem "
+                                "with your installation.\n"
+                                "Please report the problem to your "
+                                "distributor of GpgME.\n\n"
+                                "Developer's Note: The install dir can be "
+                                "manually set with: gpgme_set_global_flag",
+                                _gpgme_get_inst_dir ());
+          MessageBoxA (NULL, msg, "GpgME not installed correctly", MB_OK);
+          gpgrt_free (msg);
+          spawn_warning_shown = 1;
+        }
+      gpg_err_set_errno (EIO);
+      close (tmp_fd);
+      DeleteFileA (tmp_name);
+      free (tmp_name);
+      return TRACE_SYSRES (-1);
+    }
   if (!_gpgme_create_process_utf8 (spawnhelper,
                                    arg_string,
                                    &sec_attr, /* process security attributes */
@@ -1684,11 +1498,9 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
       close (tmp_fd);
       DeleteFileA (tmp_name);
       free (tmp_name);
-#if GPGRT_VERSION_NUMBER >= 0x013e00  /* gpgrt >= 1.62 */
-      gpgrt_w32_set_errno (lasterr);
-#else
+
+      /* FIXME: Should translate the error code.  */
       gpg_err_set_errno (EIO);
-#endif
       return TRACE_SYSRES (-1);
     }
 
@@ -1711,8 +1523,7 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
       if (!DuplicateHandle (GetCurrentProcess(), ohd,
 			    pi.hProcess, &hd, 0, TRUE, DUPLICATE_SAME_ACCESS))
 	{
-          int lasterr = (int) GetLastError ();
-	  TRACE_LOG  ("DuplicateHandle failed: ec=%d", lasterr);
+	  TRACE_LOG  ("DuplicateHandle failed: ec=%d", (int) GetLastError ());
 	  TerminateProcess (pi.hProcess, 0);
 	  /* Just in case TerminateProcess didn't work, let the
 	     process fail on its own.  */
@@ -1724,16 +1535,13 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
 	  DeleteFileA (tmp_name);
           free (tmp_name);
 
-#if GPGRT_VERSION_NUMBER >= 0x013e00  /* gpgrt >= 1.62 */
-          gpgrt_w32_set_errno (lasterr);
-#else
+	  /* FIXME: Should translate the error code.  */
 	  gpg_err_set_errno (EIO);
-#endif
           UNLOCK (fd_table_lock);
 	  return TRACE_SYSRES (-1);
         }
       /* Return the child name of this handle.  */
-      fd_list[i].peer_name = hd;
+      fd_list[i].peer_name = handle_to_fd (hd);
     }
 
   /* Write the handle translation information to the temporary
@@ -1759,7 +1567,7 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
 	len = strlen (line) - 1;
 
 	/* Format is: Local name, stdin/stdout/stderr, peer name, argv idx.  */
-	snprintf (&line[len], BUFFER_MAX - len, "0x%x %d %p %d  \n",
+	snprintf (&line[len], BUFFER_MAX - len, "0x%x %d 0x%x %d  \n",
 		  fd_list[i].fd, fd_list[i].dup_to,
 		  fd_list[i].peer_name, fd_list[i].arg_loc);
 	/* Rather safe than sorry.  */
@@ -1790,6 +1598,10 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
 	      pi.hProcess, pi.hThread,
 	      (int) pi.dwProcessId, (int) pi.dwThreadId);
 
+  if (r_pid)
+    *r_pid = (pid_t)pi.dwProcessId;
+
+
   if (ResumeThread (pi.hThread) == (DWORD)(-1))
     TRACE_LOG  ("ResumeThread failed: ec=%d", (int) GetLastError ());
 
@@ -1797,19 +1609,8 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
 
   TRACE_LOG  ("process=%p", pi.hProcess);
 
-#if ASSUAN_VERSION_NUMBER < 0x030000
-  if (r_pid)
-    *r_pid = (pid_t)pi.dwProcessId;
-
   /* We don't need to wait for the process.  */
   close_handle (pi.hProcess);
-#else
-  if (r_pid)
-    *r_pid = (assuan_pid_t)pi.hProcess;
-  else
-    /* We don't need to wait for the process.  */
-    close_handle (pi.hProcess);
-#endif
 
   if (! (flags & IOSPAWN_FLAG_NOCLOSE))
     {
@@ -1819,10 +1620,10 @@ _gpgme_io_spawn (const char *path, char *const argv[], unsigned int flags,
 
   for (i = 0; fd_list[i].fd != -1; i++)
     if (fd_list[i].dup_to == -1)
-      TRACE_LOG  ("fd[%i] = 0x%x -> %p", i, fd_list[i].fd,
+      TRACE_LOG  ("fd[%i] = 0x%x -> 0x%x", i, fd_list[i].fd,
 		  fd_list[i].peer_name);
     else
-      TRACE_LOG  ("fd[%i] = 0x%x -> %p (std%s)", i, fd_list[i].fd,
+      TRACE_LOG  ("fd[%i] = 0x%x -> 0x%x (std%s)", i, fd_list[i].fd,
 		  fd_list[i].peer_name, (fd_list[i].dup_to == 0) ? "in" :
 		  ((fd_list[i].dup_to == 1) ? "out" : "err"));
 
@@ -1842,16 +1643,14 @@ _gpgme_io_select (struct io_select_fd_s *fds, size_t nfds, int nonblock)
   int i;
   int any;
   int count;
-  int errnoset = 0;
   void *dbg_help = NULL;
-
   TRACE_BEG  (DEBUG_SYSIO, "_gpgme_io_select", fds,
-	      "nfds=%zd, nonblock=%u", nfds, nonblock);
+	      "nfds=%u, nonblock=%u", nfds, nonblock);
 
 #if 0
  restart:
 #endif
-  TRACE_SEQ (dbg_help, "selecting [ ");
+  TRACE_SEQ (dbg_help, "select on [ ");
   any = 0;
   nwait = 0;
   count = 0;
@@ -1877,6 +1676,7 @@ _gpgme_io_select (struct io_select_fd_s *fds, size_t nfds, int nonblock)
 		    {
 		      TRACE_END (dbg_help, "oops ]");
 		      TRACE_LOG ("Too many objects for WFMO!");
+		      /* FIXME: Should translate the error code.  */
 		      gpg_err_set_errno (EIO);
 		      return TRACE_SYSRES (-1);
                     }
@@ -1899,6 +1699,7 @@ _gpgme_io_select (struct io_select_fd_s *fds, size_t nfds, int nonblock)
 		    {
 		      TRACE_END (dbg_help, "oops ]");
 		      TRACE_LOG ("Too many objects for WFMO!");
+		      /* FIXME: Should translate the error code.  */
 		      gpg_err_set_errno (EIO);
 		      return TRACE_SYSRES (-1);
                     }
@@ -1965,10 +1766,6 @@ _gpgme_io_select (struct io_select_fd_s *fds, size_t nfds, int nonblock)
         }
 #endif
       TRACE_LOG  ("WFMO failed: %d", le);
-#if GPGRT_VERSION_NUMBER >= 0x013e00  /* gpgrt >= 1.62 */
-      gpgrt_w32_set_errno (le);
-      errnoset = 1;
-#endif
       count = -1;
     }
   else
@@ -1991,8 +1788,11 @@ _gpgme_io_select (struct io_select_fd_s *fds, size_t nfds, int nonblock)
       TRACE_END (dbg_help, "]");
     }
 
-  if (count < 0 && !errnoset)
+  if (count < 0)
+    {
+      /* FIXME: Should determine a proper error code.  */
       gpg_err_set_errno (EIO);
+    }
 
   return TRACE_SYSRES (count);
 }
@@ -2147,7 +1947,7 @@ _gpgme_io_socket (int domain, int type, int proto)
   fd_table[fd].want_reader = 1;
   fd_table[fd].want_writer = 1;
 
-  TRACE_SUC ("hdd=%p, fd=%d, sock=%p", hdd, fd, (void *)hdd->sock);
+  TRACE_SUC ("hdd=%p, socket=0x%x (0x%x)", hdd, fd, hdd->sock);
 
   return fd;
 }

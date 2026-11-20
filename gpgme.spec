@@ -1,7 +1,7 @@
 # This is a template.  The dist target uses it to create the real file.
 Summary: GPGME - GnuPG Made Easy
 Name: gpgme
-Version: 2.3.1
+Version: 1.24.4
 Release: 1
 URL: https://gnupg.org/gpgme.html
 Source: https://www.gnupg.org/ftp/gcrypt/gpgme/%{name}-%{version}.tar.gz
@@ -38,10 +38,12 @@ make distclean
 %post
 /sbin/ldconfig
 /sbin/install-info %{_infodir}/gpgme.info.gz %{_infodir}/dir
+/sbin/install-info %{_infodir}/gpgme-python-howto.info.gz %{_infodir}/dir
 
 %preun
 if [ "$1" = 0 ]; then
  /sbin/install-info --delete %{_infodir}/gpgme.info.gz %{_infodir}/dir
+ /sbin/install-info --delete %{_infodir}/gpgme-python-howto.info.gz %{_infodir}/dir
 fi
 
 %postun
@@ -57,6 +59,7 @@ fi
 %{_includedir}/gpgme.h
 %{_datadir}/aclocal/gpgme.m4
 %{_infodir}/gpgme.info*
+%{_infodir}/gpgme-python-howto.info*
 
 %changelog
 * Sat Aug 30 2003 Robert Schiele <rschiele@uni-mannheim.de>

@@ -44,10 +44,6 @@
 #include "ops.h"
 #include "debug.h"
 
-
-#define spacep(p)   (*(p) == ' ' || *(p) == '\t')
-
-
 
 struct key_queue_item_s
 {
@@ -73,10 +69,6 @@ typedef struct
   /* This points to the last sig in tmp_uid.  */
   gpgme_key_sig_t tmp_keysig;
 
-  /* Helper with a malloced uppercased fingerprint without '!' to be
-   * used to set the subkey_match flag.  */
-  char *requested_subkey;
-
   /* Something new is available.  */
   int key_cond;
   struct key_queue_item_s *key_queue;
@@ -94,9 +86,6 @@ release_op_data (void *hook)
 
   /* opd->tmp_uid and opd->tmp_keysig are actually part of opd->tmp_key,
      so we do not need to release them here.  */
-
-  if (opd->requested_subkey)
-    free (opd->requested_subkey);
 
   while (key)
     {
@@ -454,7 +443,7 @@ parse_sec_field15 (gpgme_key_t key, gpgme_subkey_t subkey, char *field)
       subkey->secret = 0;
       key->secret = 1;
     }
-  else if (strchr ("0123456789ABCDEFabcdef", *field))
+  else if (strchr ("01234567890ABCDEFabcdef", *field))
     {
       /* Fields starts with a hex digit; thus it is a serial number.  */
       key->secret = 1;
@@ -791,7 +780,7 @@ keylist_colon_handler (void *priv, char *line)
             return err;
         }
 
-      /* Field 17 has the curve name for ECC or the composite algo string.  */
+      /* Field 17 has the curve name for ECC.  */
       if (fields >= 17 && *field[16])
         {
           subkey->curve = strdup (field[16]);
@@ -1005,7 +994,7 @@ keylist_colon_handler (void *priv, char *line)
 
       /* Start a new (revoked) signature.  */
       assert (opd->tmp_uid == key->_last_uid);
-      keysig = _gpgme_key_add_uid_sig (key, (fields >= 10) ? field[9] : NULL);
+      keysig = _gpgme_key_add_sig (key, (fields >= 10) ? field[9] : NULL);
       if (!keysig)
 	return gpg_error (GPG_ERR_ENOMEM);	/* FIXME */
 
@@ -1218,64 +1207,6 @@ _gpgme_op_keylist_event_cb (void *data, gpgme_event_io_t type, void *type_data)
 }
 
 
-/* Return true if PATTERN requests an extackt match.  That is a
- * sequence of at least 40 hexdigits followed by an exclamation mark
- * and nothing else.  Returns a pointer to the first hexdigit or
- * NULL.  */
-static const char *
-exact_match_pattern (const char *pattern)
-{
-  const char *s;
-  int hexlen;
-  const char *start;
-
-  for(s = pattern; *s && spacep (s); s++ )  /* Skip spaces.  */
-    ;
-  if (s[0] == '0' && s[1] == 'x')  /* Skip an optional "0x" prefix.  */
-    s += 2;
-  start = s;
-  hexlen = strspn (s, "0123456789abcdefABCDEF");
-  if (hexlen >= 40 && s[hexlen] == '!')
-    {
-      s += hexlen+1;
-      /* Skip trailing spaces and LFs.  */
-      for (; *s && (spacep (s) || *s == '\n' || *s == '\r'); s++ )
-        ;
-      if (!*s) /* Only spaces seen.  */
-        return start;
-    }
-  return NULL;
-}
-
-
-/* Helper for gpgme_op_keylist_start and ..._start_ext.  */
-static gpg_error_t
-maybe_setup_for_requested_subkey (op_data_t opd, const char *pattern)
-{
-  const char *s;
-  char *p;
-
-  if (pattern && (s=exact_match_pattern (pattern)))
-    {
-      free (opd->requested_subkey);
-      p = opd->requested_subkey = strdup (s);
-      if (!p)
-        return gpg_error_from_syserror ();
-      for (; *p; p++ )
-        {
-          if (*p >= 'a' && *p <= 'z')
-            *p &= ~0x20;  /* Upcase it.  */
-          else if (*p == '!') /* Remove the '!' suffix and stop.  */
-            {
-              *p = 0;
-              break;
-            }
-        }
-    }
-  return 0;
-}
-
-
 /* Start a keylist operation within CTX, searching for keys which
    match PATTERN.  If SECRET_ONLY is true, only secret keys are
    returned.  */
@@ -1299,10 +1230,6 @@ gpgme_op_keylist_start (gpgme_ctx_t ctx, const char *pattern, int secret_only)
   err = _gpgme_op_data_lookup (ctx, OPDATA_KEYLIST, &hook,
 			       sizeof (*opd), release_op_data);
   opd = hook;
-  if (err)
-    return TRACE_ERR (err);
-
-  err = maybe_setup_for_requested_subkey (opd, pattern);
   if (err)
     return TRACE_ERR (err);
 
@@ -1349,22 +1276,6 @@ gpgme_op_keylist_ext_start (gpgme_ctx_t ctx, const char *pattern[],
   opd = hook;
   if (err)
     return TRACE_ERR (err);
-
-  if (pattern && pattern[0])
-    {
-      int i;
-
-      for (i=0; pattern[i]; i++)
-        {
-          err = maybe_setup_for_requested_subkey (opd, pattern[i]);
-          if (err)
-            return TRACE_ERR (err);
-          /* We can only handle one exact subkey request.  Thus we
-           * stop after the first seen.  */
-          if (opd->requested_subkey)
-            break;
-        }
-    }
 
   err = _gpgme_op_import_init_result (ctx);
   if (err)
@@ -1467,16 +1378,6 @@ gpgme_op_keylist_next (gpgme_ctx_t ctx, gpgme_key_t *r_key)
   *r_key = queue_item->key;
   free (queue_item);
 
-  if (opd->requested_subkey && (*r_key)->subkeys && (*r_key)->subkeys->fpr)
-    {
-      /* Time to set the mark.  */
-      gpgme_subkey_t subkey = (*r_key)->subkeys;
-
-      for (; subkey; subkey = subkey->next)
-        if (subkey->fpr && !strcmp (subkey->fpr, opd->requested_subkey))
-          subkey->subkey_match = 1;
-    }
-
   TRACE_SUC ("key=%p (%s)", *r_key,
              ((*r_key)->subkeys && (*r_key)->subkeys->fpr) ?
              (*r_key)->subkeys->fpr : "invalid");
@@ -1534,18 +1435,13 @@ gpgme_get_key (gpgme_ctx_t ctx, const char *fpr, gpgme_key_t *r_key,
   if (err)
     return TRACE_ERR (err);
   {
-    const char *ctx_flag;
     gpgme_protocol_t proto;
     gpgme_engine_info_t info;
 
     /* Clone the relevant state.  */
     proto = gpgme_get_protocol (ctx);
     gpgme_set_protocol (listctx, proto);
-    gpgme_set_offline (listctx, gpgme_get_offline (ctx));
     gpgme_set_keylist_mode (listctx, gpgme_get_keylist_mode (ctx));
-    ctx_flag = gpgme_get_ctx_flag (ctx, "auto-key-locate");
-    if (ctx_flag != NULL && *ctx_flag)
-      gpgme_set_ctx_flag (listctx, "auto-key-locate", ctx_flag);
     info = gpgme_ctx_get_engine_info (ctx);
     while (info && info->protocol != proto)
       info = info->next;

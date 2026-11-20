@@ -131,16 +131,6 @@ gpgme_error_t _gpgme_decode_c_string (const char *src, char **destp,
 gpgme_error_t _gpgme_decode_percent_string (const char *src, char **destp,
 					    size_t len, int binary);
 
-/* Decode the percent-plus escaped string SRC and store the result in the
-   buffer *DESTP which is LEN bytes long.  If LEN is zero, then a
-   large enough buffer is allocated with malloc and *DESTP is set to
-   the result.  Currently, LEN is only used to specify if allocation
-   is desired or not, the caller is expected to make sure that *DESTP
-   is large enough if LEN is not zero.  If BINARY is 1, then '\0'
-   characters are allowed in the output.  */
-gpgme_error_t _gpgme_decode_percent_plus_string (const char *src, char **destp,
-					         size_t len, int binary);
-
 gpgme_error_t _gpgme_encode_percent_string (const char *src, char **destp,
 					    size_t len);
 
@@ -223,10 +213,6 @@ const char *_gpgme_get_w32spawn_path (void);
 
 
 #include <assuan.h>
-#if ASSUAN_VERSION_NUMBER < 0x030000
-typedef pid_t assuan_pid_t;
-#endif
-
 /* System hooks for assuan integration.  */
 extern struct assuan_system_hooks _gpgme_assuan_system_hooks;
 extern struct assuan_malloc_hooks _gpgme_assuan_malloc_hooks;

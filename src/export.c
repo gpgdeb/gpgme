@@ -219,7 +219,7 @@ export_start (gpgme_ctx_t ctx, int synchronous, const char *pattern,
   _gpgme_engine_set_status_handler (ctx->engine, export_status_handler, ctx);
 
   return _gpgme_engine_op_export (ctx->engine, pattern, mode, keydata,
-				  ctx->export_filter, ctx->use_armor);
+				  ctx->use_armor);
 }
 
 
@@ -256,23 +256,8 @@ gpgme_op_export (gpgme_ctx_t ctx, const char *pattern,
 
   err = export_start (ctx, 1, pattern, mode, keydata);
   if (!err)
-    {
-      err = _gpgme_wait_one (ctx);
-      if (!err)
-        {
-          /* For this synchronous operation we check for operational
-           * errors and return them.  */
-          void *hook;
-          op_data_t opd;
-
-          err = _gpgme_op_data_lookup (ctx, OPDATA_EXPORT, &hook, -1, NULL);
-          opd = hook;
-          if (!err)
-            err = opd->err ? opd->err : opd->failure_code;
-        }
-    }
-
-  return TRACE_ERR (err);
+    err = _gpgme_wait_one (ctx);
+  return err;
 }
 
 
@@ -309,7 +294,7 @@ export_ext_start (gpgme_ctx_t ctx, int synchronous, const char *pattern[],
   _gpgme_engine_set_status_handler (ctx->engine, export_status_handler, ctx);
 
   return _gpgme_engine_op_export_ext (ctx->engine, pattern, mode, keydata,
-				      ctx->export_filter, ctx->use_armor);
+				      ctx->use_armor);
 }
 
 

@@ -31,7 +31,9 @@
 
 /* Copy SRC to DEST, returning the address of the terminating '\0' in DEST.  */
 char *
-__stpcpy (char *dest, const char *src)
+__stpcpy (dest, src)
+     char *dest;
+     const char *src;
 {
   register char *d = dest;
   register const char *s = src;

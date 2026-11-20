@@ -242,17 +242,16 @@ _gpgme_decode_c_string (const char *src, char **destp, size_t len)
 }
 
 
-/* Do the percent and plus/space decoding of string SRC and store the
-   result in the buffer *DESTP which is LEN bytes long.  If LEN is zero,
-   then a large enough buffer is allocated with malloc and *DESTP is set
-   to the result.  Currently, LEN is only used to specify if allocation
+/* Decode the percent escaped string SRC and store the result in the
+   buffer *DESTP which is LEN bytes long.  If LEN is zero, then a
+   large enough buffer is allocated with malloc and *DESTP is set to
+   the result.  Currently, LEN is only used to specify if allocation
    is desired or not, the caller is expected to make sure that *DESTP
    is large enough if LEN is not zero.  If BINARY is 1, then '\0'
-   characters are allowed in the output.  Plus decoding is only done
-   if WITHPLUS is 1.  */
-static gpgme_error_t
-do_decode_percent_or_percent_plus (const char *src, char **destp, size_t len,
-			           int binary, int withplus)
+   characters are allowed in the output.  */
+gpgme_error_t
+_gpgme_decode_percent_string (const char *src, char **destp, size_t len,
+			      int binary)
 {
   char *dest;
 
@@ -278,12 +277,7 @@ do_decode_percent_or_percent_plus (const char *src, char **destp, size_t len,
   /* Convert the string.  */
   while (*src)
     {
-      if (*src == '+' && withplus)
-        {
-          *(dest++) = ' ';
-          src++;
-        }
-      else if (*src != '%')
+      if (*src != '%')
 	{
 	  *(dest++) = *(src++);
 	  continue;
@@ -319,36 +313,6 @@ do_decode_percent_or_percent_plus (const char *src, char **destp, size_t len,
   *(dest++) = 0;
 
   return 0;
-}
-
-
-/* Decode the percent escaped string SRC and store the result in the
-   buffer *DESTP which is LEN bytes long.  If LEN is zero, then a
-   large enough buffer is allocated with malloc and *DESTP is set to
-   the result.  Currently, LEN is only used to specify if allocation
-   is desired or not, the caller is expected to make sure that *DESTP
-   is large enough if LEN is not zero.  If BINARY is 1, then '\0'
-   characters are allowed in the output.  */
-gpgme_error_t
-_gpgme_decode_percent_string (const char *src, char **destp, size_t len,
-			      int binary)
-{
-  return do_decode_percent_or_percent_plus (src, destp, len, binary, 0);
-}
-
-
-/* Decode the percent-plus escaped string SRC and store the result in the
-   buffer *DESTP which is LEN bytes long.  If LEN is zero, then a
-   large enough buffer is allocated with malloc and *DESTP is set to
-   the result.  Currently, LEN is only used to specify if allocation
-   is desired or not, the caller is expected to make sure that *DESTP
-   is large enough if LEN is not zero.  If BINARY is 1, then '\0'
-   characters are allowed in the output.  */
-gpgme_error_t
-_gpgme_decode_percent_plus_string (const char *src, char **destp, size_t len,
-			           int binary)
-{
-  return do_decode_percent_or_percent_plus (src, destp, len, binary, 1);
 }
 
 
@@ -621,12 +585,10 @@ _gpgme_parse_timestamp (const char *timestamp, char **endp)
       if (endp)
         *endp = (char*)(timestamp + 15);
 
-#ifndef HAVE_W32_SYSTEM
       /* Fixme: We would better use a configure test to see whether
          mktime can handle dates beyond 2038. */
       if (sizeof (time_t) <= 4 && year >= 2038)
         return (time_t)2145914603; /* 2037-12-31 23:23:23 */
-#endif
 
       memset (&buf, 0, sizeof buf);
       buf.tm_year = year - 1900;
@@ -693,24 +655,6 @@ _gpgme_map_pk_algo (int algo, gpgme_protocol_t protocol)
         case 19: algo = GPGME_PK_ECDSA; break;
         case 20: break;
         case 22: algo = GPGME_PK_EDDSA; break;
-
-        case 25: algo = GPGME_PK_ECDH;  break;  /* X25519 (RFC9580).  */
-        case 27: algo = GPGME_PK_EDDSA; break;  /* Ed25519 (RFC9580). */
-
-        case 30: /* ML-DSA-65+Ed25519 (RFC9980)      */
-        case 31: /* ML-DSA-87+Ed448 (RFC9980)        */
-          algo = GPGME_PK_MLDSA;
-          break;
-
-        case 35: /* ML-KEM-768+X25519 (RFC9980)      */
-        case 36: /* ML-KEM-1024+X448 (RFC9980)       */
-        case 37: /* ML-KEM-768+ECDH-NIST-P-384       */
-        case 38: /* ML-KEM-1024+ECDH-NIST-P-521      */
-        case 39: /* ML-KEM-768+ECDH-brainpoolP384r1  */
-        case 40: /* ML-KEM-1024+ECDH-brainpoolP512r1 */
-          algo = GPGME_PK_MLKEM;
-          break;
-
         default: algo = 0; break; /* Unknown.  */
         }
     }

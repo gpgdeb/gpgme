@@ -265,7 +265,7 @@ llass_new (void **engine, const char *file_name, const char *home_dir,
       err = _gpgme_getenv ("DISPLAY", &dft_display);
       if (err)
         goto leave;
-      if (dft_display && *dft_display)
+      if (dft_display)
         {
           if (gpgrt_asprintf (&optstr, "OPTION display=%s", dft_display) < 0)
             {
@@ -281,10 +281,7 @@ llass_new (void **engine, const char *file_name, const char *home_dir,
           if (err)
             goto leave;
         }
-      else
-        free (dft_display);
     }
-
 
   if (llass->opt.gpg_agent)
     err = _gpgme_getenv ("GPG_TTY", &env_tty);
@@ -716,7 +713,7 @@ start (engine_llass_t llass, const char *command)
     return gpg_error (GPG_ERR_GENERAL);	/* FIXME */
   /* For now... */
   for (i = 0; i < nfds; i++)
-    fdlist[i] = (int)(intptr_t) afdlist[i];
+    fdlist[i] = (int) afdlist[i];
 
   /* We "duplicate" the file descriptor, so we can close it here (we
      can't close fdlist[0], as that is closed by libassuan, and
@@ -844,7 +841,6 @@ struct engine_ops _gpgme_engine_ops_assuan =
     NULL,               /* setexpire */
     NULL,               /* setownertrust */
     llass_transact,     /* opassuan_transact */
-    NULL,               /* getdirect */
     NULL,		/* conf_load */
     NULL,		/* conf_save */
     NULL,		/* conf_dir */
