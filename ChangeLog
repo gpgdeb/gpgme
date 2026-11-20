@@ -1,3 +1,22 @@
+2026-11-20  Werner Koch  <wk@gnupg.org>
+
+	Release 1.24.4.
+	+ commit 1ee1f804a750fbfd852fe9fe4a6c0fb80591de69
+
+
+	Fix a double free in the status line read code.
+	+ commit b4358e92e33ad99caf82babca79f50daa8b2bb78
+	* src/engine-gpg.c (read_status): Immediately assign the realloced
+	buffer to the context and not just at the end.
+	(read_colon_line): Ditto.
+
+2025-10-27  Werner Koch  <wk@gnupg.org>
+
+	Improve tracing for engine-gpgsm.
+	+ commit 8be839308ed40e016a097815e0c11a9904c81528
+	* src/engine-gpgsm.c (gpgsm_assuan_simple_command): More tracing
+	calls.
+
 2025-05-19  Werner Koch  <wk@gnupg.org>
 
 	Release 1.24.3.
