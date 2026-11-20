@@ -1,3 +1,9 @@
+gpgme1.0 (1.24.4-1) unstable; urgency=medium
+
+  * new upstream legacy release
+
+ -- meik michalke <meik.michalke@gnupg.com>  Fri, 20 Nov 2026 13:20:23 +0100
+
 gpgme1.0 (1.24.3-2) unstable; urgency=medium
 
   * patched python tests to build with GnuPG >= 2.5.10
