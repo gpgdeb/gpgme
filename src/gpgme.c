@@ -1321,6 +1321,7 @@ gpgme_pubkey_algo_string (gpgme_subkey_t subkey)
     case GPGME_PK_RSA_E:
     case GPGME_PK_RSA_S: prefix = "rsa"; break;
     case GPGME_PK_KYBER: composite = 1; break;
+    case GPGME_PK_DLTHM: composite = 1; break;
     case GPGME_PK_ELG_E: prefix = "elg"; break;
     case GPGME_PK_DSA:	 prefix = "dsa"; break;
     case GPGME_PK_ELG:   prefix = "xxx"; break;
@@ -1328,6 +1329,8 @@ gpgme_pubkey_algo_string (gpgme_subkey_t subkey)
     case GPGME_PK_ECDH:
     case GPGME_PK_ECDSA:
     case GPGME_PK_EDDSA: prefix = "";    break;
+    case GPGME_PK_MLDSA: composite = 1; break;
+    case GPGME_PK_MLKEM: composite = 1; break;
     }
 
   if (composite && subkey->curve)
@@ -1359,6 +1362,7 @@ gpgme_pubkey_algo_name (gpgme_pubkey_algo_t algo)
     case GPGME_PK_RSA_E: return "RSA-E";
     case GPGME_PK_RSA_S: return "RSA-S";
     case GPGME_PK_KYBER: return "KYBER";
+    case GPGME_PK_DLTHM: return "DILITHIUM";
     case GPGME_PK_ELG_E: return "ELG-E";
     case GPGME_PK_DSA:   return "DSA";
     case GPGME_PK_ECC:   return "ECC";
@@ -1366,6 +1370,8 @@ gpgme_pubkey_algo_name (gpgme_pubkey_algo_t algo)
     case GPGME_PK_ECDSA: return "ECDSA";
     case GPGME_PK_ECDH:  return "ECDH";
     case GPGME_PK_EDDSA: return "EdDSA";
+    case GPGME_PK_MLDSA: return "MLDSA";
+    case GPGME_PK_MLKEM: return "MLKEM";
     default:             return NULL;
     }
 }

@@ -1,4 +1,65 @@
+2026-11-19  Werner Koch  <wk@gnupg.org>
+
+	Release 2.3.1.
+	+ commit c7cbb9a4bf254a9bfcc51c90baeea7cc19349445
+
+
+	Fix a stupid regression.
+	+ commit b283b2901ff8edb2dce1e01cae28b09f5cf02c08
+	* src/engine-gpg.c (read_status,read_colon_line): Init err.
+
+2026-11-18  Werner Koch  <wk@gnupg.org>
+
+	Release 2.3.0.
+	+ commit 9d5cd51e492d429c6d36a1a33dbcbf9f80071e0e
+
+
+2026-11-17  Werner Koch  <wk@gnupg.org>
+
+	Prepare for Dilithium support in gpg.
+	+ commit d3ed1d6763b9559421b6023e7520458ec7b1fbef
+	* src/gpgme.h.in (GPGME_PK_DLTHM): New.
+	* src/gpgme.c (gpgme_pubkey_algo_string): Add mapping.
+	(gpgme_pubkey_algo_name): Add name.
+
+2026-11-15  Werner Koch  <wk@gnupg.org>
+
+	Improve code in engine-gpg for easier debugging.
+	+ commit 4254af7dafdb263aaa5cbddf3ce00ecfb61630ed
+	* src/engine-gpg.c (read_status): Always jump to the leave label
+	  instead of using a direct return.
+	(read_colon_line): Ditto.
+	(start): Ditto.  Also rename RC to ERR.
+
+	Fix a double free in the status line read code.
+	+ commit 14499348b966cd7b3d72afee15a5cd51cdd0a727
+	* src/engine-gpg.c (read_status): Immediately assign the realloced
+	buffer to the context and not just at the end.
+	(read_colon_line): Ditto.
+
+2026-11-13  NIIBE Yutaka  <gniibe@fsij.org>
+
+	tests:gpgsm: Fix for fallback hash algorithm change in gpgsm.
+	+ commit 813658fc5f755641fc578e9a6ff2c8326679d17d
+	* tests/gpgsm/t-sign.c (check_result): Change possible valid hash
+	algorithms.
+
+2026-10-13  Werner Koch  <wk@gnupg.org>
+
+	Add the Kyber variant GPGME_PK_MLKEM and MLDSA from RFC9980.
+	+ commit a85fa492369c5f65918cb37fc6d24d473237f838
+	* src/gpgme.h.in (GPGME_PK_MLKEM, GPGME_PK_MLDSA): New.
+	* src/conversion.c (_gpgme_map_pk_algo): Map the new MLDSA, MLKEM, and
+	  RFC9580 algo variants.
+	* src/gpgme.c (gpgme_pubkey_algo_string): Mark MLDSA and MLKEM as
+	  composite.
+	(gpgme_pubkey_algo_name): Add re-mapping.
+
 2026-08-31  Werner Koch  <wk@gnupg.org>
+
+	build: Adjust online target for the new server.
+	+ commit f89319fbc8d0c2b68051a64a9b4d5424db2fa044
+	* doc/Makefile.am (online): Chnage server URL
 
 	Release 2.2.0.
 	+ commit 5c2e9553adda72753d7edc4d755814689968f88e
