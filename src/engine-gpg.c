@@ -1479,12 +1479,12 @@ add_io_cb (engine_gpg_t gpg, int fd, int dir, gpgme_io_cb_t handler, void *data,
 static gpgme_error_t
 read_status (engine_gpg_t gpg)
 {
+  gpgme_error_t err = 0;
   char *p;
   int nread;
   size_t bufsize = gpg->status.bufsize;
   char *buffer = gpg->status.buffer;
   size_t readpos = gpg->status.readpos;
-  gpgme_error_t err;
 
   assert (buffer);
   if (bufsize - readpos < 256)
@@ -1493,17 +1493,24 @@ read_status (engine_gpg_t gpg)
       bufsize += 1024;
       buffer = realloc (buffer, bufsize);
       if (!buffer)
-	return gpg_error_from_syserror ();
-    }
+	{
+          err = gpg_error_from_syserror ();
+          goto leave;
+        }
+      gpg->status.bufsize = bufsize;
+      gpg->status.buffer = buffer;
+   }
 
   nread = _gpgme_io_read (gpg->status.fd[0],
 			  buffer + readpos, bufsize-readpos);
   if (nread == -1)
-    return gpg_error_from_syserror ();
+    {
+      err = gpg_error_from_syserror ();
+      goto leave;
+    }
 
   if (!nread)
     {
-      err = 0;
       gpg->status.eof = 1;
       if (gpg->status.mon_cb)
         err = gpg->status.mon_cb (gpg->status.mon_cb_value, "", "");
@@ -1515,8 +1522,7 @@ read_status (engine_gpg_t gpg)
           if (gpg_err_code (err) == GPG_ERR_FALSE)
             err = 0; /* Drop special error code.  */
         }
-
-      return err;
+      goto leave;
     }
 
   while (nread > 0)
@@ -1549,7 +1555,7 @@ read_status (engine_gpg_t gpg)
                       err = gpg->status.mon_cb (gpg->status.mon_cb_value,
                                                 buffer + 9, rest);
                       if (err)
-                        return err;
+                        goto leave;
                     }
 		  if (r >= 0)
 		    {
@@ -1563,7 +1569,10 @@ read_status (engine_gpg_t gpg)
 			    free (gpg->cmd.keyword);
 			  gpg->cmd.keyword = strdup (rest);
 			  if (!gpg->cmd.keyword)
-			    return gpg_error_from_syserror ();
+			    {
+                              err = gpg_error_from_syserror ();
+                              goto leave;
+                            }
 			  /* This should be the last thing we have
 			     received and the next thing will be that
 			     the command handler does its action.  */
@@ -1584,7 +1593,7 @@ read_status (engine_gpg_t gpg)
                           if (gpg_err_code (err) == GPG_ERR_FALSE)
                             err = 0; /* Drop special error code.  */
 			  if (err)
-			    return err;
+			    goto leave;
                         }
                     }
                 }
@@ -1605,11 +1614,10 @@ read_status (engine_gpg_t gpg)
         }
     }
 
+ leave:
   /* Update the gpg object.  */
-  gpg->status.bufsize = bufsize;
-  gpg->status.buffer = buffer;
   gpg->status.readpos = readpos;
-  return 0;
+  return err;
 }
 
 
@@ -1633,6 +1641,7 @@ status_handler (void *opaque, int fd)
 static gpgme_error_t
 read_colon_line (engine_gpg_t gpg)
 {
+  gpg_error_t err = 0;
   char *p;
   int nread;
   size_t bufsize = gpg->colon.bufsize;
@@ -1646,19 +1655,28 @@ read_colon_line (engine_gpg_t gpg)
       bufsize += 1024;
       buffer = realloc (buffer, bufsize);
       if (!buffer)
-	return gpg_error_from_syserror ();
+	{
+          err = gpg_error_from_syserror ();
+          goto leave;
+        }
+      gpg->colon.bufsize = bufsize;
+      gpg->colon.buffer  = buffer;
     }
 
   nread = _gpgme_io_read (gpg->colon.fd[0], buffer+readpos, bufsize-readpos);
   if (nread == -1)
-    return gpg_error_from_syserror ();
+    {
+      err = gpg_error_from_syserror ();
+      goto leave;
+    }
 
   if (!nread)
     {
       gpg->colon.eof = 1;
       assert (gpg->colon.fnc);
       gpg->colon.fnc (gpg->colon.fnc_value, NULL);
-      return 0;
+      err = 0;
+      goto leave;
     }
 
   while (nread > 0)
@@ -1679,11 +1697,9 @@ read_colon_line (engine_gpg_t gpg)
 
 		  if (gpg->colon.preprocess_fnc)
 		    {
-		      gpgme_error_t err;
-
 		      err = gpg->colon.preprocess_fnc (buffer, &line);
 		      if (err)
-			return err;
+			goto leave;
 		    }
 
 		  assert (gpg->colon.fnc);
@@ -1725,11 +1741,10 @@ read_colon_line (engine_gpg_t gpg)
         }
     }
 
+ leave:
   /* Update the gpg object.  */
-  gpg->colon.bufsize = bufsize;
-  gpg->colon.buffer  = buffer;
   gpg->colon.readpos = readpos;
-  return 0;
+  return err;
 }
 
 
@@ -1757,7 +1772,7 @@ colon_line_handler (void *opaque, int fd)
 static gpgme_error_t
 start (engine_gpg_t gpg)
 {
-  gpgme_error_t rc;
+  gpg_error_t err;
   int i, n;
   int status;
   struct spawn_fd_item_s *fd_list;
@@ -1773,57 +1788,57 @@ start (engine_gpg_t gpg)
   if (!pgmname)
     return trace_gpg_error (GPG_ERR_INV_ENGINE);
 
-  rc = gpgme_data_new (&gpg->diagnostics);
-  if (rc)
-    return rc;
+  err = gpgme_data_new (&gpg->diagnostics);
+  if (err)
+    goto leave;
 
   if (gpg->flags.use_gpgtar)
     {
       /* Read the diagnostics output from gpgtar's stderr. */
-      rc = add_data (gpg, gpg->diagnostics, 2, 1);
-      if (rc)
-        return rc;
+      err = add_data (gpg, gpg->diagnostics, 2, 1);
+      if (err)
+        goto leave;
     }
   else
     {
-      rc = add_data_ext (gpg, gpg->diagnostics, -2, 1, 1);
-      if (rc)
-        return rc;
+      err = add_data_ext (gpg, gpg->diagnostics, -2, 1, 1);
+      if (err)
+        goto leave;
 
-      rc = add_arg_ext (gpg, "--logger-fd", 1);
-      if (rc)
-        return rc;
+      err = add_arg_ext (gpg, "--logger-fd", 1);
+      if (err)
+        goto leave;
     }
 
   {
     char buf[25];
     _gpgme_io_fd2str (buf, sizeof (buf), gpg->status.fd[1]);
-    rc = add_arg_with_locp (gpg, buf, &gpg->status.arg_loc, 1);
-    if (rc)
-      return rc;
+    err = add_arg_with_locp (gpg, buf, &gpg->status.arg_loc, 1);
+    if (err)
+      goto leave;
   }
 
-  rc = add_arg_ext (gpg, "--status-fd", 1);
-  if (rc)
-    return rc;
+  err = add_arg_ext (gpg, "--status-fd", 1);
+  if (err)
+    goto leave;
 
   if (gpg->lc_ctype)
     {
-      rc = add_gpg_arg_with_value (gpg, "--lc-ctype=", gpg->lc_ctype, 1);
-      if (rc)
-	return rc;
+      err = add_gpg_arg_with_value (gpg, "--lc-ctype=", gpg->lc_ctype, 1);
+      if (err)
+	goto leave;
     }
 
   if (gpg->lc_messages)
     {
-      rc = add_gpg_arg_with_value (gpg, "--lc-messages=", gpg->lc_messages, 1);
-      if (rc)
-	return rc;
+      err = add_gpg_arg_with_value (gpg, "--lc-messages=", gpg->lc_messages, 1);
+      if (err)
+	goto leave;
     }
 
-  rc = build_argv (gpg, pgmname);
-  if (rc)
-    return rc;
+  err = build_argv (gpg, pgmname);
+  if (err)
+    goto leave;
 
   /* status_fd, colon_fd and end of list.  */
   n = 3;
@@ -1831,7 +1846,10 @@ start (engine_gpg_t gpg)
     n++;
   fd_list = calloc (n, sizeof *fd_list);
   if (! fd_list)
-    return gpg_error_from_syserror ();
+    {
+      err = gpg_error_from_syserror ();
+      goto leave;
+    }
 
   /* Build the fd list for the child.  */
   n = 0;
@@ -1859,28 +1877,28 @@ start (engine_gpg_t gpg)
                             (IOSPAWN_FLAG_DETACHED |IOSPAWN_FLAG_ALLOW_SET_FG),
                             fd_list, NULL, NULL, NULL);
   {
-    int saved_err = gpg_error_from_syserror ();
+    err = gpg_error_from_syserror ();
     free (fd_list);
     if (status == -1)
-      return saved_err;
+      goto leave;
   }
 
   /*_gpgme_register_term_handler ( closure, closure_value, pid );*/
 
-  rc = add_io_cb (gpg, gpg->status.fd[0], 1, status_handler, gpg,
+  err = add_io_cb (gpg, gpg->status.fd[0], 1, status_handler, gpg,
 		  &gpg->status.tag);
-  if (rc)
+  if (err)
     /* FIXME: kill the child */
-    return rc;
+    goto leave;
 
   if (gpg->colon.fnc)
     {
       assert (gpg->colon.fd[0] != -1);
-      rc = add_io_cb (gpg, gpg->colon.fd[0], 1, colon_line_handler, gpg,
+      err = add_io_cb (gpg, gpg->colon.fd[0], 1, colon_line_handler, gpg,
 		      &gpg->colon.tag);
-      if (rc)
+      if (err)
 	/* FIXME: kill the child */
-	return rc;
+	goto leave;
     }
 
   for (i = 0; gpg->fd_data_map[i].data; i++)
@@ -1893,23 +1911,25 @@ start (engine_gpg_t gpg)
 	}
       else
 	{
-	  rc = add_io_cb (gpg, gpg->fd_data_map[i].fd,
+	  err = add_io_cb (gpg, gpg->fd_data_map[i].fd,
 			  gpg->fd_data_map[i].inbound,
 			  gpg->fd_data_map[i].inbound
 			  ? _gpgme_data_inbound_handler
 			  : _gpgme_data_outbound_handler,
 			  gpg->fd_data_map[i].data, &gpg->fd_data_map[i].tag);
 
-	  if (rc)
+	  if (err)
 	    /* FIXME: kill the child */
-	    return rc;
+	    goto leave;
 	}
     }
 
   gpg_io_event (gpg, GPGME_EVENT_START, NULL);
+  err = 0;
 
+ leave:
   /* fixme: check what data we can release here */
-  return 0;
+  return err;
 }
 
 
